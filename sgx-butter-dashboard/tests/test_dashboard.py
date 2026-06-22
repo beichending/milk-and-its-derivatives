@@ -121,6 +121,16 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["front_symbol"], "BTRF26")
         self.assertEqual(payload["summary"]["distant_symbol"], "BTRN26")
 
+    def test_incomplete_requested_date_falls_back_to_latest_complete_date(self):
+        self.connection.execute(
+            "INSERT INTO history VALUES ('2026-06-22', 'BTRN26', NULL, 0, 100)"
+        )
+        self.connection.commit()
+        payload = dashboard.build_payload(
+            self.connection, business_date="2026-06-22", days=30
+        )
+        self.assertEqual(payload["meta"]["business_date"], "2026-06-19")
+
     def test_generates_self_contained_html(self):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "dashboard.html"

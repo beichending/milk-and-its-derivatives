@@ -588,8 +588,6 @@ def build_payload(
         if (delivery_month := delivery_month_from_symbol(symbol)) is not None
     )
     views: dict[str, dict[str, Any]] = {}
-    full_current_view: dict[str, Any] | None = None
-    target_date = business_date
     for selected_date in all_dates:
         if selected_date[:7] < earliest_delivery_month:
             continue
@@ -597,13 +595,18 @@ def build_payload(
         if view is None:
             continue
         views[selected_date] = compact_view(view)
-        if target_date == selected_date or (
-            target_date is None and full_current_view is None
-        ):
-            full_current_view = view
-            target_date = selected_date
-    if full_current_view is None or target_date is None:
+    if not views:
         raise RuntimeError("No complete front/six-month historical views available")
+    requested_date = business_date or max(views)
+    eligible_target_dates = [date for date in views if date <= requested_date]
+    target_date = (
+        max(eligible_target_dates) if eligible_target_dates else max(views)
+    )
+    full_current_view = build_historical_view(
+        history, target_date, days, all_alerts
+    )
+    if full_current_view is None:
+        raise RuntimeError(f"Unable to rebuild complete view for {target_date}")
 
     anomaly_stats = calibrate_anomaly_days(
         views,
