@@ -82,6 +82,7 @@ Open `dashboard.html` directly in a browser. It presents:
 
 - A historical-date dropdown that rolls the front month and exact +6M contract
 - Daily settlement-price changes for the nearest six delivery months
+- Bid, ask, and `ask - bid` gap for each of the nearest six contracts
 - The contract exactly six calendar months after the front month and its settlement
 - Daily `total-volume` for the nearest six contracts; open interest is shown separately
 - Daily calendar spread: six-month distant settlement minus front-month settlement

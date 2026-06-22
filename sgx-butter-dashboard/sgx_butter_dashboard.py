@@ -235,9 +235,14 @@ def make_estimate(
 def load_history_universe(
     connection: sqlite3.Connection,
 ) -> dict[str, list[dict[str, Any]]]:
+    history_columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(history)")
+    }
+    raw_expression = "raw_json" if "raw_json" in history_columns else "NULL AS raw_json"
     rows = connection.execute(
-        """
-        SELECT business_date, symbol, settlement, volume, open_interest
+        f"""
+        SELECT business_date, symbol, settlement, volume, open_interest,
+               {raw_expression}
         FROM history ORDER BY symbol, business_date
         """
     ).fetchall()
@@ -246,12 +251,21 @@ def load_history_universe(
         delivery_month = delivery_month_from_symbol(row["symbol"])
         if not delivery_month:
             continue
+        raw: dict[str, Any] = {}
+        if row["raw_json"]:
+            try:
+                parsed = json.loads(row["raw_json"])
+                raw = parsed if isinstance(parsed, dict) else {}
+            except (TypeError, json.JSONDecodeError):
+                raw = {}
         result.setdefault(row["symbol"], []).append(
             {
                 "date": row["business_date"],
                 "settlement": positive_price(row["settlement"]),
                 "volume": number(row["volume"]) or 0,
                 "open_interest": number(row["open_interest"]),
+                "bid": positive_price(raw.get("best-bid-price-abs")),
+                "ask": positive_price(raw.get("best-ask-price-abs")),
             }
         )
     return result
@@ -316,8 +330,14 @@ def build_historical_view(
             "previous_settlement": previous,
             "daily_change": pct_change(current["settlement"], previous),
             "last_price": None,
-            "bid": None,
-            "ask": None,
+            "bid": current.get("bid"),
+            "ask": current.get("ask"),
+            "bid_ask_gap": (
+                current["ask"] - current["bid"]
+                if current.get("bid") is not None
+                and current.get("ask") is not None
+                else None
+            ),
             "volume": current["volume"],
             "average_volume_20d": (
                 statistics.mean(recent_volumes) if recent_volumes else 0
@@ -388,6 +408,9 @@ def build_historical_view(
             "total_open_interest": sum(item["open_interest"] for item in contracts),
             "breadth_up": sum(1 for value in daily_changes if value > 0),
             "breadth_down": sum(1 for value in daily_changes if value < 0),
+            "two_sided_quote_count": sum(
+                1 for item in contracts if item["bid_ask_gap"] is not None
+            ),
         },
         "contracts": contracts,
         "series": series,
@@ -677,7 +700,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     .asof-control { display:flex; align-items:center; gap:9px; flex:0 0 auto; }
     .asof-control label { color:#344054; font-size:11px; font-weight:650; }
     .asof-control select { min-width:160px; height:34px; padding:0 34px 0 11px; color:var(--navy); background:#fff; border:1px solid #98A2B3; border-radius:7px; font:650 12px inherit; cursor:pointer; }
-    .kpis { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:12px; margin-bottom:18px; }
+    .kpis { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:12px; margin-bottom:18px; }
     .kpi, .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); }
     .kpi { padding:15px 16px 14px; min-height:92px; }
     .kpi-label { color:var(--muted); font-size:11px; font-weight:650; letter-spacing:.03em; margin-bottom:10px; }
@@ -704,6 +727,13 @@ HTML_TEMPLATE = r"""<!doctype html>
     .contract-code { font-size:11px; font-weight:700; white-space:nowrap; }
     .contract-price { font-size:14px; font-weight:700; margin-top:5px; }
     .contract-change { font-size:10px; margin-top:3px; }
+    .quote-divider { height:1px; margin:10px 0 8px; background:#EAECF0; }
+    .quote-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+    .quote-item { min-width:0; }
+    .quote-label { color:#98A2B3; font-size:8px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+    .quote-value { color:var(--ink); font-size:10px; font-weight:650; margin-top:3px; overflow:hidden; text-overflow:ellipsis; }
+    .quote-value.gap { color:var(--blue); }
+    .quote-missing { color:#98A2B3!important; font-weight:500; }
     .spread-section { border-top:1px solid #F2F4F7; background:#FCFCFD; }
     .spread-head { display:flex; justify-content:space-between; align-items:flex-end; gap:18px; padding:15px 20px 2px; }
     .spread-title { color:var(--ink); font-size:12px; font-weight:700; }
@@ -794,6 +824,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         </div>
         <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
         <div class="legend" id="priceLegend"></div>
+        <div class="section-label" style="padding-top:2px">Settlement & Bid-Ask Gap · Gap = Ask − Bid</div>
         <div class="contract-strip" id="contractStrip"></div>
       </section>
 
@@ -888,7 +919,8 @@ function renderViewText() {
     ['远月结算价', s.distant_settlement == null ? '—' : fmt.format(s.distant_settlement), `<span class="${cls(s.distant_daily_change)}">${pct(s.distant_daily_change)} 日变动</span>`],
     ['六合约成交量', fmt.format(s.total_volume), '当日累计成交手数'],
     ['六合约未平仓量', fmt.format(s.total_open_interest), 'Open interest · 非成交量'],
-    ['上涨 / 下跌', `${s.breadth_up} / ${s.breadth_down}`, '六个近月合约市场宽度']
+    ['上涨 / 下跌', `${s.breadth_up} / ${s.breadth_down}`, '六个近月合约市场宽度'],
+    ['有效双边报价', `${s.two_sided_quote_count} / 6`, 'Bid 与 Ask 同时存在']
   ];
   document.getElementById('kpis').innerHTML = kpis.map(x => `<div class="kpi"><div class="kpi-label">${x[0]}</div><div class="kpi-value">${x[1]}</div><div class="kpi-sub">${x[2]}</div></div>`).join('');
   const legendHTML = VIEW.contracts.map(c => `<div class="legend-item"><span class="swatch" style="background:${c.color}"></span>${c.symbol} · ${monthLabel(c.delivery_month)}</div>`).join('');
@@ -903,6 +935,12 @@ function renderViewText() {
       <div class="contract-code" style="color:${c.color}">${c.symbol}</div>
       <div class="contract-price">${c.settlement == null ? '—' : fmt.format(c.settlement)}</div>
       <div class="contract-change ${cls(c.daily_change)}">${pct(c.daily_change)}</div>
+      <div class="quote-divider"></div>
+      <div class="quote-row">
+        <div class="quote-item"><div class="quote-label">Bid</div><div class="quote-value ${c.bid==null?'quote-missing':''}">${c.bid==null?'—':fmt.format(c.bid)}</div></div>
+        <div class="quote-item"><div class="quote-label">Ask</div><div class="quote-value ${c.ask==null?'quote-missing':''}">${c.ask==null?'—':fmt.format(c.ask)}</div></div>
+        <div class="quote-item"><div class="quote-label">Gap</div><div class="quote-value gap ${c.bid_ask_gap==null?'quote-missing':''}">${c.bid_ask_gap==null?'—':fmt.format(c.bid_ask_gap)}</div></div>
+      </div>
     </div>`).join('');
   const e = VIEW.estimate;
   document.getElementById('estimate').innerHTML = `

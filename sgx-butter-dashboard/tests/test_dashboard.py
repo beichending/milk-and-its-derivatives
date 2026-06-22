@@ -1,5 +1,6 @@
 import importlib.util
 import datetime as dt
+import json
 import pathlib
 import sqlite3
 import tempfile
@@ -29,7 +30,7 @@ class DashboardTests(unittest.TestCase):
             );
             CREATE TABLE history (
                 business_date TEXT, symbol TEXT, settlement REAL,
-                volume REAL, open_interest REAL
+                volume REAL, open_interest REAL, raw_json TEXT
             );
             CREATE TABLE alerts (
                 alert_id INTEGER PRIMARY KEY, created_at TEXT, business_date TEXT,
@@ -57,7 +58,11 @@ class DashboardTests(unittest.TestCase):
             )
             for day in range(1, 22):
                 self.connection.execute(
-                    "INSERT INTO history VALUES (?, ?, ?, ?, ?)",
+                    """
+                    INSERT INTO history
+                    (business_date, symbol, settlement, volume, open_interest)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
                     (
                         f"2026-05-{day:02d}",
                         symbol,
@@ -67,11 +72,32 @@ class DashboardTests(unittest.TestCase):
                     ),
                 )
             self.connection.execute(
-                "INSERT INTO history VALUES ('2026-06-19', ?, ?, ?, ?)",
-                (symbol, 5000 + index, index, 100),
+                """
+                INSERT INTO history
+                (business_date, symbol, settlement, volume, open_interest, raw_json)
+                VALUES ('2026-06-19', ?, ?, ?, ?, ?)
+                """,
+                (
+                    symbol,
+                    5000 + index,
+                    index,
+                    100,
+                    json.dumps(
+                        {
+                            "best-bid-price-abs": 4995,
+                            "best-ask-price-abs": 5005,
+                        }
+                        if symbol == "BTRN26"
+                        else {}
+                    ),
+                ),
             )
         self.connection.execute(
-            "INSERT INTO history VALUES ('2026-05-20', 'BTRM26', 4990, 2, 90)"
+            """
+            INSERT INTO history
+            (business_date, symbol, settlement, volume, open_interest)
+            VALUES ('2026-05-20', 'BTRM26', 4990, 2, 90)
+            """
         )
         self.connection.commit()
 
@@ -89,6 +115,10 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["distant_delivery_month"], "2027-01")
         self.assertEqual(payload["summary"]["current_spread"], 6)
         self.assertEqual(payload["spread_series"][-1]["spread"], 6)
+        self.assertEqual(payload["contracts"][0]["bid"], 4995)
+        self.assertEqual(payload["contracts"][0]["ask"], 5005)
+        self.assertEqual(payload["contracts"][0]["bid_ask_gap"], 10)
+        self.assertEqual(payload["summary"]["two_sided_quote_count"], 1)
         self.assertIn("2026-06-19", payload["available_dates"])
         self.assertEqual(
             payload["views"]["2026-06-19"]["summary"]["front_symbol"], "BTRN26"
@@ -101,18 +131,30 @@ class DashboardTests(unittest.TestCase):
 
     def test_historical_date_rolls_front_and_distant_contracts(self):
         self.connection.execute(
-            "INSERT INTO history VALUES ('2025-11-20', 'BTRZ25', 4790, 1, 60)"
+            """
+            INSERT INTO history
+            (business_date, symbol, settlement, volume, open_interest)
+            VALUES ('2025-11-20', 'BTRZ25', 4790, 1, 60)
+            """
         )
         for index, symbol in enumerate(
             ["BTRF26", "BTRG26", "BTRH26", "BTRJ26", "BTRK26", "BTRM26"],
             start=1,
         ):
             self.connection.execute(
-                "INSERT INTO history VALUES ('2025-12-19', ?, ?, ?, ?)",
+                """
+                INSERT INTO history
+                (business_date, symbol, settlement, volume, open_interest)
+                VALUES ('2025-12-19', ?, ?, ?, ?)
+                """,
                 (symbol, 4800 + index, index, 70 + index),
             )
         self.connection.execute(
-            "INSERT INTO history VALUES ('2025-12-19', 'BTRN26', 4810, 7, 80)"
+            """
+            INSERT INTO history
+            (business_date, symbol, settlement, volume, open_interest)
+            VALUES ('2025-12-19', 'BTRN26', 4810, 7, 80)
+            """
         )
         self.connection.commit()
         payload = dashboard.build_payload(
@@ -123,7 +165,11 @@ class DashboardTests(unittest.TestCase):
 
     def test_incomplete_requested_date_falls_back_to_latest_complete_date(self):
         self.connection.execute(
-            "INSERT INTO history VALUES ('2026-06-22', 'BTRN26', NULL, 0, 100)"
+            """
+            INSERT INTO history
+            (business_date, symbol, settlement, volume, open_interest)
+            VALUES ('2026-06-22', 'BTRN26', NULL, 0, 100)
+            """
         )
         self.connection.commit()
         payload = dashboard.build_payload(
@@ -147,7 +193,11 @@ class DashboardTests(unittest.TestCase):
 
     def test_non_positive_price_is_treated_as_missing(self):
         self.connection.execute(
-            "INSERT INTO history VALUES ('2026-06-18', 'BTRN26', 0, 8, 100)"
+            """
+            INSERT INTO history
+            (business_date, symbol, settlement, volume, open_interest)
+            VALUES ('2026-06-18', 'BTRN26', 0, 8, 100)
+            """
         )
         self.connection.commit()
         payload = dashboard.build_payload(
