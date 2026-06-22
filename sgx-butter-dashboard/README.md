@@ -87,6 +87,7 @@ Open `dashboard.html` directly in a browser. It presents:
 - Daily `total-volume` for the nearest six contracts; open interest is shown separately
 - Daily calendar spread: six-month distant settlement minus front-month settlement
 - Rule-based alerts and a direct 1–2 week best-estimate conclusion
+- A business interpretation and confirmation checklist for every alert
 
 Historical anomaly days are calibrated to a 5% target frequency. For each
 eligible date, the dashboard ranks price movement, total volume,

@@ -757,7 +757,11 @@ HTML_TEMPLATE = r"""<!doctype html>
     .alert-mark { width:7px; height:7px; border-radius:50%; margin-top:4px; background:var(--green); }
     .alert.warning .alert-mark { background:#F79009; } .alert.critical .alert-mark { background:#D92D20; } .alert.info .alert-mark { background:#2E90FA; }
     .alert-title { font-size:11px; font-weight:700; margin-bottom:3px; }
+    .alert-meta { color:#98A2B3; font-size:9px; margin-bottom:5px; }
     .alert-text { color:var(--muted); font-size:11px; line-height:1.4; }
+    .alert-business { margin-top:9px; padding:9px 10px; border-radius:6px; background:#F8FAFC; border-left:2px solid #84ADFF; color:#344054; font-size:10px; line-height:1.5; }
+    .alert-business strong { color:var(--blue); font-size:9px; letter-spacing:.04em; }
+    .alert-check { margin-top:5px; color:#667085; font-size:9px; line-height:1.45; }
     .method { margin:0 18px 18px; border-top:1px solid var(--line); padding-top:14px; color:var(--muted); font-size:10px; line-height:1.55; }
     footer { display:flex; justify-content:space-between; gap:20px; margin-top:18px; color:#98A2B3; font-size:10px; }
     .tooltip { display:none; position:fixed; z-index:20; pointer-events:none; background:#101828; color:#fff; padding:8px 10px; border-radius:6px; font-size:10px; line-height:1.55; box-shadow:0 4px 12px rgba(16,24,40,.2); }
@@ -954,11 +958,94 @@ function renderViewText() {
     settlement_return:'结算价异常',
     volume_spike:'成交量异常',
     open_interest_change:'持仓变化异常',
-    curve_spread:'期限价差异常'
+    curve_spread:'期限价差异常',
+    preliminary_settlement_gap:'初步与最终结算价偏差',
+    missing_settlement:'结算价缺失',
+    stale_market_data:'市场数据滞后',
+    duplicate_contract:'合约记录重复',
+    contract_count_drop:'合约数量异常减少',
+    schema_field_removed:'数据字段缺失',
+    schema_field_added:'新增数据字段',
+    new_contract:'新合约出现',
+    contract_removed:'合约不再返回'
   }[rule] || rule.replaceAll('_',' '));
+  const reasonMeaning = reason => ({
+    price:{
+      meaning:'价格波动显著偏离近期常态，可能代表供需预期被快速重定价、突发基本面消息，或低流动性下的价格跳变。',
+      check:'结合成交量和 Bid-Ask Gap；放量且价差稳定时，价格信号通常更可信。'
+    },
+    volume:{
+      meaning:'成交量异常放大，可能代表新信息触发集中交易，也可能是临近交割时的换月或头寸迁移；本身不代表明确涨跌方向。',
+      check:'结合持仓变化判断：量升仓增偏向新资金入场，量升仓降更可能是平仓或换月。'
+    },
+    oi:{
+      meaning:'未平仓量变化异常，说明市场风险敞口正在快速建立或退出，可能对应新资金入场、集中平仓或交割前移仓。',
+      check:'观察持仓变化方向，并结合价格：价涨仓增偏多头建立，价跌仓增偏空头建立。'
+    },
+    spread:{
+      meaning:'远近月价差快速变化，可能反映现货松紧、库存与融资成本预期改变，或换月交易推动期限曲线重新定价。',
+      check:'持续的近月升水通常偏向现货端紧张；远月升水扩大则更可能反映供应改善或持有成本。'
+    }
+  }[reason]);
+  const alertMeaning = a => {
+    if (a.rule === 'calibrated_daily_anomaly') {
+      const primary = a.details && a.details.primary_reason;
+      return reasonMeaning(primary) || {
+        meaning:'多个市场指标同步偏离各自近期分布，可能意味着市场进入新的定价或流动性状态。',
+        check:'拆分查看价格、成交量、持仓和 Spread，确认异常由哪一项主导。'
+      };
+    }
+    if (a.rule === 'settlement_return') {
+      const direction = a.current_value > 0 ? '向上' : a.current_value < 0 ? '向下' : '';
+      return {
+        meaning:`结算价出现异常${direction}重定价，可能对应供需预期变化、突发消息或流动性不足；单日跳动不一定形成持续趋势。`,
+        check:'结合成交量、持仓以及次日价格是否延续进行确认。'
+      };
+    }
+    if (a.rule === 'volume_spike') return reasonMeaning('volume');
+    if (a.rule === 'open_interest_change') {
+      const establishing = a.current_value > 0;
+      return {
+        meaning:establishing
+          ? '未平仓量异常增加，通常代表新头寸或新增风险敞口进入市场。'
+          : '未平仓量异常减少，通常代表集中平仓、到期退出或跨月移仓。',
+        check:'结合价格方向与成交量，区分趋势性建仓和技术性换月。'
+      };
+    }
+    if (a.rule === 'curve_spread') return reasonMeaning('spread');
+    if (a.rule === 'preliminary_settlement_gap') return {
+      meaning:'初步与最终结算价差异较大，可能来自收盘后修订、流动性较低或定价样本变化。',
+      check:'以最终结算价为准，并检查该偏差是否在多个合约同步出现。'
+    };
+    if (['missing_settlement','stale_market_data','duplicate_contract','contract_count_drop','schema_field_removed'].includes(a.rule)) return {
+      meaning:'这更可能是数据完整性或数据源异常，不应直接解读为市场供需信号。',
+      check:'先核对 SGX 原始页面与下一次采集结果，再用于交易或风险判断。'
+    };
+    if (['schema_field_added','new_contract','contract_removed'].includes(a.rule)) return {
+      meaning:'这通常反映合约生命周期或 SGX 数据结构变化，不代表价格方向。',
+      check:'确认是否为正常挂牌、到期摘牌或接口字段调整。'
+    };
+    return {
+      meaning:'该指标偏离近期常态，可能反映市场状态或数据状态发生变化。',
+      check:'结合价格、成交量、持仓、期限结构及原始数据交叉确认。'
+    };
+  };
+  const renderAlert = a => {
+    const insight = alertMeaning(a);
+    const meta = [a.business_date, a.symbol].filter(Boolean).join(' · ');
+    return `<div class="alert ${a.severity}">
+      <span class="alert-mark"></span>
+      <div>
+        <div class="alert-title">${alertTitle(a.rule)}</div>
+        ${meta ? `<div class="alert-meta">${meta}</div>` : ''}
+        <div class="alert-text">${a.message}</div>
+        <div class="alert-business"><strong>业务含义</strong><br>${insight.meaning}<div class="alert-check"><strong>观察重点：</strong>${insight.check}</div></div>
+      </div>
+    </div>`;
+  };
   alertBox.innerHTML = VIEW.alerts.length
-    ? VIEW.alerts.map(a => `<div class="alert ${a.severity}"><span class="alert-mark"></span><div><div class="alert-title">${alertTitle(a.rule)}</div><div class="alert-text">${a.message}</div></div></div>`).join('')
-    : `<div class="alert"><span class="alert-mark"></span><div><div class="alert-title">No statistical anomaly</div><div class="alert-text">该交易日的综合异常分数未超过动态 95 分位门槛。</div></div></div>`;
+    ? VIEW.alerts.map(renderAlert).join('')
+    : `<div class="alert"><span class="alert-mark"></span><div><div class="alert-title">No statistical anomaly</div><div class="alert-text">该交易日的综合异常分数未超过动态 95 分位门槛。</div><div class="alert-business"><strong>业务含义</strong><br>价格、成交量、持仓与期限价差整体处于历史常态区间，没有出现足够强的状态切换信号。<div class="alert-check"><strong>注意：</strong>无统计异常不等于无市场风险，低流动性也可能降低异常识别能力。</div></div></div></div>`;
   const stats=DATA.anomaly_stats;
   document.getElementById('method').innerHTML = `${e.disclaimer}<br><br><strong>异常校准：</strong>目标 ${(stats.target_rate*100).toFixed(1)}%；历史回测 ${stats.alert_days}/${stats.eligible_days} 日（${(stats.actual_rate*100).toFixed(2)}%）。每日综合价格、成交量、持仓及 Spread 的近 ${stats.feature_window} 日排名，并以过去 ${stats.calibration_window} 日约 95 分位为门槛。<br><br><strong>成交量口径：</strong>${DATA.meta.volume_definition}<br><strong>持仓口径：</strong>${DATA.meta.open_interest_definition}`;
 }
