@@ -721,13 +721,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     .legend { display:flex; flex-wrap:wrap; gap:8px 16px; padding:0 20px 16px; }
     .legend-item { display:flex; align-items:center; gap:6px; color:var(--ink); font-size:11px; }
     .swatch { width:8px; height:8px; border-radius:2px; }
-    .quote-board { background:#FCFCFD; border-bottom:1px solid #EAECF0; }
-    .quote-board-head { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:11px 20px 8px; }
-    .quote-board-title { color:var(--ink); font-size:11px; font-weight:750; }
-    .quote-board-note { color:var(--muted); font-size:9px; margin-top:3px; }
-    .quote-status { flex:0 0 auto; padding:5px 8px; color:#027A48; background:#ECFDF3; border:1px solid #ABEFC6; border-radius:999px; font-size:9px; font-weight:700; }
-    .quote-status.missing { color:#B54708; background:#FFFAEB; border-color:#FEDF89; }
-    .contract-strip { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); border-top:1px solid #EAECF0; }
+    .contract-strip { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); border-top:1px solid #F2F4F7; }
     .contract-cell { padding:12px 12px 13px; border-right:1px solid #F2F4F7; min-width:0; }
     .contract-cell:last-child { border-right:0; }
     .contract-code { font-size:11px; font-weight:700; white-space:nowrap; }
@@ -781,7 +775,6 @@ HTML_TEMPLATE = r"""<!doctype html>
       .asof-control { width:100%; justify-content:space-between; }
       .asof-control select { flex:1; }
       .kpis { grid-template-columns:repeat(2,1fr); }
-      .quote-board-head { align-items:flex-start; flex-direction:column; }
       .contract-strip { grid-template-columns:repeat(3,1fr); }
       .contract-cell:nth-child(3) { border-right:0; }
       .contract-cell:nth-child(-n+3) { border-bottom:1px solid #F2F4F7; }
@@ -833,18 +826,10 @@ HTML_TEMPLATE = r"""<!doctype html>
             <button data-days="30">30D</button><button data-days="60" class="active">60D</button><button data-days="120">120D</button>
           </div>
         </div>
-        <div class="quote-board">
-          <div class="quote-board-head">
-            <div>
-              <div class="quote-board-title">最近六个合约 · Bid / Ask / Gap</div>
-              <div class="quote-board-note">Gap = Ask − Bid；任一侧报价缺失时显示“—”</div>
-            </div>
-            <div class="quote-status" id="quoteStatus"></div>
-          </div>
-          <div class="contract-strip" id="contractStrip"></div>
-        </div>
         <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
         <div class="legend" id="priceLegend"></div>
+        <div class="section-label" style="padding-top:2px">Settlement & Bid-Ask Gap · Gap = Ask − Bid</div>
+        <div class="contract-strip" id="contractStrip"></div>
       </section>
 
       <section class="panel">
@@ -949,11 +934,6 @@ function renderViewText() {
   document.getElementById('spreadValue').textContent = s.current_spread == null ? '—' : `${s.current_spread >= 0 ? '+' : ''}${fmt.format(s.current_spread)}`;
   document.getElementById('spreadValue').className = `spread-value ${cls(s.current_spread)}`;
   document.getElementById('spreadPercent').textContent = `相对近月 ${pct(s.current_spread_percentage)}`;
-  const quoteStatus = document.getElementById('quoteStatus');
-  quoteStatus.textContent = s.two_sided_quote_count
-    ? `有效双边报价 ${s.two_sided_quote_count} / 6`
-    : '暂无有效双边报价 · 0 / 6';
-  quoteStatus.classList.toggle('missing', !s.two_sided_quote_count);
   document.getElementById('contractStrip').innerHTML = VIEW.contracts.map(c => `
     <div class="contract-cell">
       <div class="contract-code" style="color:${c.color}">${c.symbol}</div>
