@@ -21,7 +21,6 @@ DATA_QUALITY_ALERT_RULES = {
     "duplicate_contract",
     "contract_count_drop",
     "schema_field_removed",
-    "missing_settlement",
 }
 MONTH_CODE_TO_NUMBER = {
     "F": 1,

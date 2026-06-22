@@ -222,17 +222,17 @@ class DashboardTests(unittest.TestCase):
             (
                 2,
                 "2026-06-19",
-                "BTRN26",
+                None,
                 "critical",
-                "missing_settlement",
+                "contract_count_drop",
                 "material data quality alert",
             ),
             (
                 3,
                 "2026-06-18",
-                "BTRN26",
+                None,
                 "critical",
-                "missing_settlement",
+                "contract_count_drop",
                 "prior-day data quality alert",
             ),
         ]
@@ -249,7 +249,7 @@ class DashboardTests(unittest.TestCase):
             self.connection, business_date="2026-06-19", days=30
         )
         rules = [item["rule"] for item in payload["alerts"]]
-        self.assertEqual(rules, ["missing_settlement"])
+        self.assertEqual(rules, ["contract_count_drop"])
         self.assertEqual(
             payload["alerts"][0]["message"], "material data quality alert"
         )
