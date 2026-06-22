@@ -221,6 +221,8 @@ class DashboardTests(unittest.TestCase):
             self.assertIn('"distant_symbol":"BTRF27"', content)
             self.assertIn("spreadChart", content)
             self.assertIn("asOfDate", content)
+            self.assertIn('id="refreshButton"', content)
+            self.assertIn("url.searchParams.set('_refresh'", content)
             self.assertIn("业务含义", content)
             self.assertIn("观察重点", content)
             self.assertNotIn("__DATA__", content)

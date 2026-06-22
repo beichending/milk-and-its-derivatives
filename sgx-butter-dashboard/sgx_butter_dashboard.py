@@ -761,8 +761,12 @@ HTML_TEMPLATE = r"""<!doctype html>
     h1 { font-size:27px; line-height:1.2; margin:0 0 8px; letter-spacing:-.025em; }
     .subtitle { color:var(--muted); font-size:13px; }
     .meta { text-align:right; color:var(--muted); font-size:12px; line-height:1.8; }
+    .meta-head { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:2px; }
     .status { display:inline-flex; align-items:center; gap:7px; color:var(--green); font-weight:650; }
     .dot { width:7px; height:7px; border-radius:50%; background:currentColor; box-shadow:0 0 0 3px rgba(6,118,71,.12); }
+    .refresh-button { display:inline-flex; align-items:center; gap:5px; height:29px; padding:0 10px; border:1px solid #98A2B3; border-radius:7px; color:#344054; background:#fff; font:650 11px inherit; cursor:pointer; box-shadow:0 1px 2px rgba(16,24,40,.05); }
+    .refresh-button:hover { color:var(--blue); border-color:#84ADFF; background:#F5F8FF; }
+    .refresh-button:disabled { color:#98A2B3; cursor:wait; background:#F9FAFB; }
     .asof-bar { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:14px; padding:12px 14px; background:#EEF4FF; border:1px solid #D1E0FF; border-radius:9px; }
     .asof-copy { display:flex; align-items:center; gap:10px; min-width:0; }
     .asof-icon { display:grid; place-items:center; width:29px; height:29px; flex:0 0 auto; border-radius:7px; color:var(--blue); background:#fff; border:1px solid #D1E0FF; font-size:15px; }
@@ -841,7 +845,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       .grid { grid-template-columns:1fr; }
     }
     @media (max-width:720px) {
-      .shell { padding:20px 14px 32px; } header { flex-direction:column; } .meta { text-align:left; }
+      .shell { padding:20px 14px 32px; } header { flex-direction:column; } .meta { text-align:left; } .meta-head { justify-content:flex-start; }
       .asof-bar { align-items:flex-start; flex-direction:column; }
       .asof-control { width:100%; justify-content:space-between; }
       .asof-control select { flex:1; }
@@ -863,7 +867,10 @@ HTML_TEMPLATE = r"""<!doctype html>
       <div class="subtitle">最近六个活跃合约 · 结算价、成交量、期限结构与异常信号</div>
     </div>
     <div class="meta">
-      <div class="status" id="dataStatus"><span class="dot"></span><span></span></div>
+      <div class="meta-head">
+        <div class="status" id="dataStatus"><span class="dot"></span><span></span></div>
+        <button class="refresh-button" id="refreshButton" type="button" title="绕过浏览器缓存，重新载入最新已发布页面">↻ 刷新页面</button>
+      </div>
       <div>市场业务日 <strong id="businessDate"></strong></div>
       <div>生成时间 <span id="generatedAt"></span></div>
     </div>
@@ -1203,9 +1210,20 @@ function applyView(date) {
 }
 const asOfSelect = document.getElementById('asOfDate');
 asOfSelect.innerHTML = DATA.available_dates.map((date,index) => `<option value="${date}">${date}${index===0?' · 最新':''}</option>`).join('');
-asOfSelect.value = DATA.meta.business_date;
+const requestedAsOf = new URL(window.location.href).searchParams.get('asof');
+const initialDate = DATA.available_dates.includes(requestedAsOf) ? requestedAsOf : DATA.meta.business_date;
+asOfSelect.value = initialDate;
 asOfSelect.addEventListener('change',()=>applyView(asOfSelect.value));
-applyView(DATA.meta.business_date);
+document.getElementById('refreshButton').addEventListener('click', event => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  button.textContent = '↻ 刷新中';
+  const url = new URL(window.location.href);
+  url.searchParams.set('_refresh', Date.now().toString());
+  url.searchParams.set('asof', asOfSelect.value);
+  window.location.replace(url.toString());
+});
+applyView(initialDate);
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(render,100);});
 </script>
 </body>
