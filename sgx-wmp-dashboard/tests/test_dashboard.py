@@ -209,6 +209,51 @@ class DashboardTests(unittest.TestCase):
             "2026-06-22",
         )
 
+    def test_alerts_show_selected_day_data_quality_not_contract_diagnostics(self):
+        rows = [
+            (
+                1,
+                "2026-06-19",
+                "WMPN26",
+                "critical",
+                "volume_spike",
+                "diagnostic volume alert",
+            ),
+            (
+                2,
+                "2026-06-19",
+                "WMPN26",
+                "critical",
+                "missing_settlement",
+                "material data quality alert",
+            ),
+            (
+                3,
+                "2026-06-18",
+                "WMPN26",
+                "critical",
+                "missing_settlement",
+                "prior-day data quality alert",
+            ),
+        ]
+        self.connection.executemany(
+            """
+            INSERT INTO alerts
+            (alert_id, business_date, symbol, severity, rule, message)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+        self.connection.commit()
+        payload = dashboard.build_payload(
+            self.connection, business_date="2026-06-19", days=30
+        )
+        rules = [item["rule"] for item in payload["alerts"]]
+        self.assertEqual(rules, ["missing_settlement"])
+        self.assertEqual(
+            payload["alerts"][0]["message"], "material data quality alert"
+        )
+
     def test_generates_self_contained_html(self):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "dashboard.html"
@@ -223,6 +268,7 @@ class DashboardTests(unittest.TestCase):
             self.assertIn("asOfDate", content)
             self.assertIn('id="refreshButton"', content)
             self.assertIn("url.searchParams.set('_refresh'", content)
+            self.assertIn("Alert 展示口径", content)
             self.assertIn("业务含义", content)
             self.assertIn("观察重点", content)
             self.assertNotIn("__DATA__", content)

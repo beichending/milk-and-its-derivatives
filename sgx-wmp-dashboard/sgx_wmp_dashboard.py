@@ -16,6 +16,13 @@ from zoneinfo import ZoneInfo
 
 
 COLORS = ["#175CD3", "#0E9384", "#F79009", "#7A5AF8", "#D92D20", "#667085"]
+DATA_QUALITY_ALERT_RULES = {
+    "stale_market_data",
+    "duplicate_contract",
+    "contract_count_drop",
+    "schema_field_removed",
+    "missing_settlement",
+}
 MONTH_CODE_TO_NUMBER = {
     "F": 1,
     "G": 2,
@@ -440,14 +447,12 @@ def build_historical_view(
             }
         )
 
-    selected_day = dt.date.fromisoformat(selected_date)
-    alert_floor = (selected_day - dt.timedelta(days=30)).isoformat()
     selected_alerts = [
         item
         for item in alerts
-        if item.get("business_date")
-        and alert_floor <= item["business_date"] <= selected_date
-    ][:20]
+        if item.get("business_date") == selected_date
+        and item.get("rule") in DATA_QUALITY_ALERT_RULES
+    ][:6]
     daily_changes = [
         item["daily_change"] for item in contracts if item["daily_change"] is not None
     ]
@@ -1127,7 +1132,7 @@ function renderViewText() {
     ? VIEW.alerts.map(renderAlert).join('')
     : `<div class="alert"><span class="alert-mark"></span><div><div class="alert-title">No statistical anomaly</div><div class="alert-text">该交易日的综合异常分数未超过动态 95 分位门槛。</div><div class="alert-business"><strong>业务含义</strong><br>价格、成交量、持仓与期限价差整体处于历史常态区间，没有出现足够强的状态切换信号。<div class="alert-check"><strong>注意：</strong>无统计异常不等于无市场风险，低流动性也可能降低异常识别能力。</div></div></div></div>`;
   const stats=DATA.anomaly_stats;
-  document.getElementById('method').innerHTML = `${e.disclaimer}<br><br><strong>异常校准：</strong>目标 ${(stats.target_rate*100).toFixed(1)}%；历史回测 ${stats.alert_days}/${stats.eligible_days} 日（${(stats.actual_rate*100).toFixed(2)}%）。每日综合价格、成交量、持仓及 Spread 的近 ${stats.feature_window} 日排名，并以过去 ${stats.calibration_window} 日约 95 分位为门槛。<br><br><strong>成交量口径：</strong>${DATA.meta.volume_definition}<br><strong>持仓口径：</strong>${DATA.meta.open_interest_definition}`;
+  document.getElementById('method').innerHTML = `${e.disclaimer}<br><br><strong>Alert 展示口径：</strong>仅展示所选交易日的综合市场异常，以及影响数据可靠性的重大质量告警。逐合约价格、成交量、持仓与 Spread 诊断已并入综合分数，不再重复逐条告警。<br><br><strong>异常校准：</strong>目标 ${(stats.target_rate*100).toFixed(1)}%；历史回测 ${stats.alert_days}/${stats.eligible_days} 日（${(stats.actual_rate*100).toFixed(2)}%）。每日综合价格、成交量、持仓及 Spread 的近 ${stats.feature_window} 日排名，并以过去 ${stats.calibration_window} 日约 95 分位为门槛。<br><br><strong>成交量口径：</strong>${DATA.meta.volume_definition}<br><strong>持仓口径：</strong>${DATA.meta.open_interest_definition}`;
 }
 
 function setupCanvas(canvas) {
