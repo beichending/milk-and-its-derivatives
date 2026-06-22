@@ -407,8 +407,164 @@ def compact_view(view: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def percentile_rank(value: float | None, history: list[float | None]) -> float | None:
+    sample = [
+        float(item)
+        for item in history
+        if item is not None and math.isfinite(float(item))
+    ]
+    if value is None or len(sample) < 20:
+        return None
+    return sum(item <= value for item in sample) / len(sample)
+
+
+def quantile_nearest_rank(values: list[float], probability: float) -> float:
+    ordered = sorted(values)
+    index = max(0, math.ceil(probability * len(ordered)) - 1)
+    return ordered[index]
+
+
+def calibrate_anomaly_days(
+    views: dict[str, dict[str, Any]],
+    target_rate: float = 0.05,
+    feature_window: int = 60,
+    calibration_window: int = 252,
+    minimum_calibration: int = 60,
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    previous: dict[str, Any] | None = None
+    for business_date in sorted(views):
+        view = views[business_date]
+        summary = view["summary"]
+        price_changes = [
+            abs(item["daily_change"])
+            for item in view["contracts"]
+            if item["daily_change"] is not None
+        ]
+        row = {
+            "date": business_date,
+            "price": max(price_changes) if price_changes else None,
+            "volume": float(summary["total_volume"]),
+            "oi": float(summary["total_open_interest"]),
+            "spread": summary["current_spread"],
+        }
+        row["oi_move"] = (
+            abs(row["oi"] - previous["oi"]) if previous is not None else None
+        )
+        row["spread_move"] = (
+            abs(row["spread"] - previous["spread"])
+            if previous is not None
+            and row["spread"] is not None
+            and previous["spread"] is not None
+            else None
+        )
+        rows.append(row)
+        previous = row
+
+    eligible = 0
+    alerts = 0
+    reason_counts = {"price": 0, "volume": 0, "oi": 0, "spread": 0}
+    for index, row in enumerate(rows):
+        feature_history = rows[max(0, index - feature_window) : index]
+        components = {
+            "price": percentile_rank(
+                row["price"], [item["price"] for item in feature_history]
+            ),
+            "volume": percentile_rank(
+                row["volume"], [item["volume"] for item in feature_history]
+            ),
+            "oi": percentile_rank(
+                row["oi_move"], [item["oi_move"] for item in feature_history]
+            ),
+            "spread": percentile_rank(
+                row["spread_move"], [item["spread_move"] for item in feature_history]
+            ),
+        }
+        ranked = sorted(
+            (value for value in components.values() if value is not None), reverse=True
+        )
+        row["components"] = components
+        row["score"] = (
+            sum(ranked[:2]) / min(2, len(ranked)) if ranked else None
+        )
+        calibration_scores = [
+            item["score"]
+            for item in rows[max(0, index - calibration_window) : index]
+            if item.get("score") is not None
+        ]
+        if row["score"] is None or len(calibration_scores) < minimum_calibration:
+            continue
+        eligible += 1
+        threshold = quantile_nearest_rank(calibration_scores, 1 - target_rate)
+        row["threshold"] = threshold
+        if row["score"] <= threshold:
+            continue
+        alerts += 1
+        ranked_reasons = sorted(
+            (
+                (name, value)
+                for name, value in components.items()
+                if value is not None
+            ),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        primary_reason = ranked_reasons[0][0]
+        reason_counts[primary_reason] += 1
+        reason_labels = {
+            "price": "价格变动",
+            "volume": "成交量",
+            "oi": "持仓变化",
+            "spread": "远近月 Spread 变化",
+        }
+        reason_text = "；".join(
+            f"{reason_labels[name]}处于近 {feature_window} 日第 {value:.0%} 百分位"
+            for name, value in ranked_reasons[:2]
+        )
+        severity = (
+            "critical"
+            if row["score"]
+            > quantile_nearest_rank(calibration_scores, 0.99)
+            else "warning"
+        )
+        views[row["date"]]["alerts"] = [
+            {
+                "created_at": None,
+                "business_date": row["date"],
+                "symbol": None,
+                "severity": severity,
+                "rule": "calibrated_daily_anomaly",
+                "message": f"历史校准异常日：{reason_text}",
+                "current_value": row["score"],
+                "reference_value": threshold,
+                "score": row["score"],
+                "details": {
+                    "components": components,
+                    "primary_reason": primary_reason,
+                    "target_rate": target_rate,
+                },
+            }
+        ] + views[row["date"]].get("alerts", [])
+
+    return {
+        "target_rate": target_rate,
+        "feature_window": feature_window,
+        "calibration_window": calibration_window,
+        "eligible_days": eligible,
+        "alert_days": alerts,
+        "actual_rate": alerts / eligible if eligible else 0.0,
+        "reason_counts": reason_counts,
+    }
+
+
 def build_payload(
-    connection: sqlite3.Connection, business_date: str | None = None, days: int = 120
+    connection: sqlite3.Connection,
+    business_date: str | None = None,
+    days: int = 120,
+    target_anomaly_rate: float = 0.05,
+    anomaly_feature_window: int = 60,
+    anomaly_calibration_window: int = 252,
+    anomaly_minimum_calibration: int = 60,
 ) -> dict[str, Any]:
     connection.row_factory = sqlite3.Row
     history = load_history_universe(connection)
@@ -449,6 +605,14 @@ def build_payload(
     if full_current_view is None or target_date is None:
         raise RuntimeError("No complete front/six-month historical views available")
 
+    anomaly_stats = calibrate_anomaly_days(
+        views,
+        target_rate=target_anomaly_rate,
+        feature_window=anomaly_feature_window,
+        calibration_window=anomaly_calibration_window,
+        minimum_calibration=anomaly_minimum_calibration,
+    )
+    full_current_view["alerts"] = views[target_date]["alerts"]
     lag = business_day_lag(target_date)
     generated_at = dt.datetime.now(ZoneInfo("Asia/Singapore")).isoformat(
         timespec="seconds"
@@ -469,6 +633,7 @@ def build_payload(
         "available_dates": list(views),
         "views": views,
         "history": history,
+        "anomaly_stats": anomaly_stats,
         **full_current_view,
     }
 
@@ -743,10 +908,18 @@ function renderViewText() {
     <div class="estimate-tags"><span class="tag ${e.direction_class}">方向：${e.direction}</span><span class="tag">置信度：${e.confidence}</span></div>
     <ul class="reasons">${e.rationale.map(x=>`<li>${x}</li>`).join('')}</ul>`;
   const alertBox = document.getElementById('alerts');
+  const alertTitle = rule => ({
+    calibrated_daily_anomaly:'历史校准异常日',
+    settlement_return:'结算价异常',
+    volume_spike:'成交量异常',
+    open_interest_change:'持仓变化异常',
+    curve_spread:'期限价差异常'
+  }[rule] || rule.replaceAll('_',' '));
   alertBox.innerHTML = VIEW.alerts.length
-    ? VIEW.alerts.map(a => `<div class="alert ${a.severity}"><span class="alert-mark"></span><div><div class="alert-title">${a.rule.replaceAll('_',' ')}</div><div class="alert-text">${a.message}</div></div></div>`).join('')
-    : `<div class="alert"><span class="alert-mark"></span><div><div class="alert-title">No active statistical alert</div><div class="alert-text">截至该回溯日，最近 30 日未触发已配置的异常规则。</div></div></div>`;
-  document.getElementById('method').innerHTML = `${e.disclaimer}<br><br><strong>成交量口径：</strong>${DATA.meta.volume_definition}<br><strong>持仓口径：</strong>${DATA.meta.open_interest_definition}`;
+    ? VIEW.alerts.map(a => `<div class="alert ${a.severity}"><span class="alert-mark"></span><div><div class="alert-title">${alertTitle(a.rule)}</div><div class="alert-text">${a.message}</div></div></div>`).join('')
+    : `<div class="alert"><span class="alert-mark"></span><div><div class="alert-title">No statistical anomaly</div><div class="alert-text">该交易日的综合异常分数未超过动态 95 分位门槛。</div></div></div>`;
+  const stats=DATA.anomaly_stats;
+  document.getElementById('method').innerHTML = `${e.disclaimer}<br><br><strong>异常校准：</strong>目标 ${(stats.target_rate*100).toFixed(1)}%；历史回测 ${stats.alert_days}/${stats.eligible_days} 日（${(stats.actual_rate*100).toFixed(2)}%）。每日综合价格、成交量、持仓及 Spread 的近 ${stats.feature_window} 日排名，并以过去 ${stats.calibration_window} 日约 95 分位为门槛。<br><br><strong>成交量口径：</strong>${DATA.meta.volume_definition}<br><strong>持仓口径：</strong>${DATA.meta.open_interest_definition}`;
 }
 
 function setupCanvas(canvas) {
@@ -844,8 +1017,20 @@ def generate_dashboard(
     output_path: Path,
     business_date: str | None = None,
     days: int = 120,
+    target_anomaly_rate: float = 0.05,
+    anomaly_feature_window: int = 60,
+    anomaly_calibration_window: int = 252,
+    anomaly_minimum_calibration: int = 60,
 ) -> Path:
-    payload = build_payload(connection, business_date=business_date, days=days)
+    payload = build_payload(
+        connection,
+        business_date=business_date,
+        days=days,
+        target_anomaly_rate=target_anomaly_rate,
+        anomaly_feature_window=anomaly_feature_window,
+        anomaly_calibration_window=anomaly_calibration_window,
+        anomaly_minimum_calibration=anomaly_minimum_calibration,
+    )
     serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace(
         "</", "<\\/"
     )
@@ -862,6 +1047,10 @@ def main() -> int:
     parser.add_argument("--output", default="dashboard.html")
     parser.add_argument("--business-date")
     parser.add_argument("--days", type=int, default=120)
+    parser.add_argument("--target-anomaly-rate", type=float, default=0.05)
+    parser.add_argument("--anomaly-feature-window", type=int, default=60)
+    parser.add_argument("--anomaly-calibration-window", type=int, default=252)
+    parser.add_argument("--anomaly-minimum-calibration", type=int, default=60)
     args = parser.parse_args()
     database = Path(args.database).resolve()
     output = Path(args.output).resolve()
@@ -869,7 +1058,14 @@ def main() -> int:
     connection.row_factory = sqlite3.Row
     try:
         path = generate_dashboard(
-            connection, output, business_date=args.business_date, days=args.days
+            connection,
+            output,
+            business_date=args.business_date,
+            days=args.days,
+            target_anomaly_rate=args.target_anomaly_rate,
+            anomaly_feature_window=args.anomaly_feature_window,
+            anomaly_calibration_window=args.anomaly_calibration_window,
+            anomaly_minimum_calibration=args.anomaly_minimum_calibration,
         )
     finally:
         connection.close()

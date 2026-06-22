@@ -1,4 +1,5 @@
 import importlib.util
+import datetime as dt
 import pathlib
 import sqlite3
 import tempfile
@@ -149,6 +150,49 @@ class DashboardTests(unittest.TestCase):
         )
         self.assertIsNone(zero_point["settlement"])
         self.assertEqual(zero_point["volume"], 8)
+
+    def test_calibrated_anomaly_rate_is_close_to_target(self):
+        views = {}
+        start = dt.date(2025, 1, 1)
+        for index in range(320):
+            business_date = (start + dt.timedelta(days=index)).isoformat()
+            spike = index > 0 and index % 20 == 0
+            contracts = [
+                {
+                    "daily_change": 0.05 if spike and contract_index == 0 else 0.001,
+                }
+                for contract_index in range(6)
+            ]
+            views[business_date] = {
+                "summary": {
+                    "total_volume": 500 if spike else 10 + index % 5,
+                    "total_open_interest": 1000 + index + (100 if spike else 0),
+                    "current_spread": -100 + index % 7 + (80 if spike else 0),
+                },
+                "contracts": contracts,
+                "alerts": [],
+            }
+        stats = dashboard.calibrate_anomaly_days(
+            views,
+            target_rate=0.05,
+            feature_window=60,
+            calibration_window=252,
+            minimum_calibration=60,
+        )
+        self.assertGreater(stats["eligible_days"], 200)
+        self.assertGreater(stats["actual_rate"], 0.02)
+        self.assertLess(stats["actual_rate"], 0.08)
+        self.assertEqual(
+            sum(
+                1
+                for view in views.values()
+                if any(
+                    alert["rule"] == "calibrated_daily_anomaly"
+                    for alert in view["alerts"]
+                )
+            ),
+            stats["alert_days"],
+        )
 
 
 if __name__ == "__main__":

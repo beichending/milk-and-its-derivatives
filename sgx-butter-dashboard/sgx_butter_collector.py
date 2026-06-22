@@ -53,6 +53,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "alerts_file": "data/alerts.jsonl",
     "dashboard": "dashboard.html",
     "dashboard_history_days": 120,
+    "target_anomaly_rate": 0.05,
+    "anomaly_feature_window": 60,
+    "anomaly_calibration_window": 252,
+    "anomaly_minimum_calibration": 60,
     "alert": {
         "webhook_url": "",
         "smtp_host": "",
@@ -971,6 +975,10 @@ def collect(config_path: Path, bootstrap: bool = True, notify: bool = True) -> i
             resolve_path(config_path, config["dashboard"]),
             business_date=business_date,
             days=int(config["dashboard_history_days"]),
+            target_anomaly_rate=float(config["target_anomaly_rate"]),
+            anomaly_feature_window=int(config["anomaly_feature_window"]),
+            anomaly_calibration_window=int(config["anomaly_calibration_window"]),
+            anomaly_minimum_calibration=int(config["anomaly_minimum_calibration"]),
         )
         connection.execute(
             """

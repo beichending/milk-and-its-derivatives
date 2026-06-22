@@ -87,6 +87,13 @@ Open `dashboard.html` directly in a browser. It presents:
 - Daily calendar spread: six-month distant settlement minus front-month settlement
 - Rule-based alerts and a direct 1–2 week best-estimate conclusion
 
+Historical anomaly days are calibrated to a 5% target frequency. For each
+eligible date, the dashboard ranks price movement, total volume,
+open-interest change, and front/+6M spread movement against their trailing
+60-day distributions. The average of the two strongest signals is compared
+with the trailing 252-day 95th percentile. This produces roughly one anomaly
+day in twenty while retaining an explanation of the dominant causes.
+
 The dashboard has no external JavaScript or CSS dependencies and is rebuilt by
 the scheduled collector after every successful SGX data update. The first
 bootstrap also downloads expired monthly BTR contracts so retrospective dates
