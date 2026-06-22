@@ -1,4 +1,4 @@
-name: Update and deploy SGX Butter dashboard
+name: Update and deploy SGX dairy dashboards
 
 on:
   push:
@@ -7,6 +7,9 @@ on:
       - "sgx-butter-dashboard/*.py"
       - "sgx-butter-dashboard/config.example.json"
       - "sgx-butter-dashboard/tests/**"
+      - "sgx-wmp-dashboard/*.py"
+      - "sgx-wmp-dashboard/config.example.json"
+      - "sgx-wmp-dashboard/tests/**"
       - ".github/workflows/sgx-butter-pages.yml"
   workflow_dispatch:
   schedule:
@@ -35,25 +38,35 @@ jobs:
           python-version: "3.13"
 
       - name: Prepare public configuration
-        working-directory: sgx-butter-dashboard
-        run: cp config.example.json config.json
+        run: |
+          cp sgx-butter-dashboard/config.example.json sgx-butter-dashboard/config.json
+          cp sgx-wmp-dashboard/config.example.json sgx-wmp-dashboard/config.json
 
-      - name: Collect SGX data and rebuild dashboard
+      - name: Collect SGX Butter data and rebuild dashboard
         working-directory: sgx-butter-dashboard
         run: python sgx_butter_collector.py --config config.json collect --no-notify
+
+      - name: Collect SGX WMP data and rebuild dashboard
+        working-directory: sgx-wmp-dashboard
+        run: python sgx_wmp_collector.py --config config.json collect --no-notify
 
       - name: Persist the updated public market-data snapshot
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add sgx-butter-dashboard/dashboard.html sgx-butter-dashboard/data/sgx_butter.sqlite3
-          git diff --cached --quiet || git commit -m "data: refresh SGX Butter dashboard"
+          git add \
+            sgx-butter-dashboard/dashboard.html \
+            sgx-butter-dashboard/data/sgx_butter.sqlite3 \
+            sgx-wmp-dashboard/dashboard.html \
+            sgx-wmp-dashboard/data/sgx_wmp.sqlite3
+          git diff --cached --quiet || git commit -m "data: refresh SGX dairy dashboards"
           git push
 
       - name: Prepare Pages site
         run: |
-          mkdir -p _site
+          mkdir -p _site/wmp
           cp sgx-butter-dashboard/dashboard.html _site/index.html
+          cp sgx-wmp-dashboard/dashboard.html _site/wmp/index.html
           touch _site/.nojekyll
 
       - name: Configure GitHub Pages

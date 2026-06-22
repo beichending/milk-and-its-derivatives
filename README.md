@@ -1,9 +1,9 @@
 # milk-and-its-derivatives
 
-## SGX Butter Futures dashboard
+## SGX dairy futures dashboards
 
-The dashboard source and historical market-data store are in
-[`sgx-butter-dashboard/`](sgx-butter-dashboard/).
+- Butter (`BTR`): [`sgx-butter-dashboard/`](sgx-butter-dashboard/)
+- Whole Milk Powder (`WMP`): [`sgx-wmp-dashboard/`](sgx-wmp-dashboard/)
 
-GitHub Actions refreshes SGX BTR data and publishes the dashboard on weekdays
-at 19:45 China/Singapore time.
+GitHub Actions refreshes both SGX dairy datasets and publishes both dashboards
+on weekdays at 19:45 China/Singapore time.

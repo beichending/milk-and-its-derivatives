@@ -1,0 +1,23 @@
+# Local/private configuration
+config.json
+
+# Generated run output not required by the public repository
+logs/
+data/*.json
+data/*.csv
+data/*.jsonl
+data/*.sqlite3-wal
+data/*.sqlite3-shm
+
+# Keep the public historical database used by the hosted workflow
+!data/sgx_wmp.sqlite3
+
+# Python/editor files
+__pycache__/
+*.py[cod]
+.venv/
+.idea/
+.vscode/
+
+# GitHub Pages build directory
+_site/

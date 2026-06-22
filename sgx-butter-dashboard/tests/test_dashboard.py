@@ -52,9 +52,18 @@ class DashboardTests(unittest.TestCase):
             self.connection.execute(
                 """
                 INSERT INTO snapshots VALUES
-                ('2026-06-19', ?, ?, '2027-01-01', ?, ?, NULL, NULL, NULL, ?, ?, '')
+                ('2026-06-19', ?, ?, '2027-01-01', ?, ?, NULL, ?, ?, ?, ?, '')
                 """,
-                (symbol, delivery_month, 5000 + index, 5000 + index, index, 100),
+                (
+                    symbol,
+                    delivery_month,
+                    5000 + index,
+                    5000 + index,
+                    4995 if symbol == "BTRN26" else None,
+                    5005 if symbol == "BTRN26" else None,
+                    index,
+                    100,
+                ),
             )
             for day in range(1, 22):
                 self.connection.execute(
@@ -164,18 +173,41 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["distant_symbol"], "BTRN26")
 
     def test_incomplete_requested_date_falls_back_to_latest_complete_date(self):
-        self.connection.execute(
-            """
-            INSERT INTO history
-            (business_date, symbol, settlement, volume, open_interest)
-            VALUES ('2026-06-22', 'BTRN26', NULL, 0, 100)
-            """
-        )
+        for index, symbol in enumerate(
+            ["BTRN26", "BTRQ26", "BTRU26", "BTRV26", "BTRX26", "BTRZ26"],
+            start=1,
+        ):
+            self.connection.execute(
+                """
+                INSERT INTO snapshots
+                (business_date, symbol, delivery_month, settlement,
+                 preliminary_settlement, bid, ask, volume, open_interest)
+                VALUES ('2026-06-22', ?, NULL, NULL, ?, ?, ?, 0, 100)
+                """,
+                (symbol, 5100 + index, 5090 + index, 5110 + index),
+            )
+            self.connection.execute(
+                """
+                INSERT INTO history
+                (business_date, symbol, settlement, volume, open_interest)
+                VALUES ('2026-06-22', ?, NULL, 0, 100)
+                """,
+                (symbol,),
+            )
         self.connection.commit()
         payload = dashboard.build_payload(
             self.connection, business_date="2026-06-22", days=30
         )
         self.assertEqual(payload["meta"]["business_date"], "2026-06-19")
+        self.assertEqual(payload["summary"]["quote_date"], "2026-06-22")
+        self.assertEqual(payload["summary"]["two_sided_quote_count"], 6)
+        self.assertEqual(payload["contracts"][0]["bid"], 5091)
+        self.assertEqual(payload["contracts"][0]["ask"], 5111)
+        self.assertEqual(payload["contracts"][0]["bid_ask_gap"], 20)
+        self.assertEqual(
+            payload["views"]["2026-06-19"]["summary"]["quote_date"],
+            "2026-06-22",
+        )
 
     def test_generates_self_contained_html(self):
         with tempfile.TemporaryDirectory() as directory:

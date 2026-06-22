@@ -271,6 +271,69 @@ def load_history_universe(
     return result
 
 
+def load_latest_snapshot_quotes(
+    connection: sqlite3.Connection, requested_date: str | None = None
+) -> tuple[str | None, dict[str, dict[str, float | None]]]:
+    table_exists = connection.execute(
+        """
+        SELECT 1 FROM sqlite_master
+        WHERE type='table' AND name='snapshots'
+        """
+    ).fetchone()
+    if not table_exists:
+        return None, {}
+    if requested_date:
+        date_row = connection.execute(
+            "SELECT MAX(business_date) FROM snapshots WHERE business_date <= ?",
+            (requested_date,),
+        ).fetchone()
+    else:
+        date_row = connection.execute(
+            "SELECT MAX(business_date) FROM snapshots"
+        ).fetchone()
+    quote_date = date_row[0] if date_row else None
+    if not quote_date:
+        return None, {}
+    rows = connection.execute(
+        """
+        SELECT symbol, bid, ask
+        FROM snapshots WHERE business_date=?
+        """,
+        (quote_date,),
+    ).fetchall()
+    return quote_date, {
+        row["symbol"]: {
+            "bid": positive_price(row["bid"]),
+            "ask": positive_price(row["ask"]),
+        }
+        for row in rows
+    }
+
+
+def apply_snapshot_quotes(
+    view: dict[str, Any],
+    quote_date: str | None,
+    quotes: dict[str, dict[str, float | None]],
+) -> None:
+    if not quote_date or not quotes:
+        return
+    for contract in view["contracts"]:
+        quote = quotes.get(contract["symbol"])
+        if not quote:
+            continue
+        contract["bid"] = quote["bid"]
+        contract["ask"] = quote["ask"]
+        contract["bid_ask_gap"] = (
+            quote["ask"] - quote["bid"]
+            if quote["bid"] is not None and quote["ask"] is not None
+            else None
+        )
+    view["summary"]["two_sided_quote_count"] = sum(
+        1 for item in view["contracts"] if item["bid_ask_gap"] is not None
+    )
+    view["summary"]["quote_date"] = quote_date
+
+
 def build_historical_view(
     history: dict[str, list[dict[str, Any]]],
     selected_date: str,
@@ -620,7 +683,10 @@ def build_payload(
         views[selected_date] = compact_view(view)
     if not views:
         raise RuntimeError("No complete front/six-month historical views available")
-    requested_date = business_date or max(views)
+    latest_snapshot_date, _ = load_latest_snapshot_quotes(connection)
+    requested_date = business_date or max(
+        date for date in (max(views), latest_snapshot_date) if date
+    )
     eligible_target_dates = [date for date in views if date <= requested_date]
     target_date = (
         max(eligible_target_dates) if eligible_target_dates else max(views)
@@ -630,6 +696,11 @@ def build_payload(
     )
     if full_current_view is None:
         raise RuntimeError(f"Unable to rebuild complete view for {target_date}")
+    quote_date, latest_quotes = load_latest_snapshot_quotes(
+        connection, requested_date=requested_date
+    )
+    apply_snapshot_quotes(full_current_view, quote_date, latest_quotes)
+    apply_snapshot_quotes(views[target_date], quote_date, latest_quotes)
 
     anomaly_stats = calibrate_anomaly_days(
         views,
@@ -828,7 +899,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         </div>
         <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
         <div class="legend" id="priceLegend"></div>
-        <div class="section-label" style="padding-top:2px">Settlement & Bid-Ask Gap · Gap = Ask − Bid</div>
+        <div class="section-label" id="quoteLabel" style="padding-top:2px"></div>
         <div class="contract-strip" id="contractStrip"></div>
       </section>
 
@@ -934,6 +1005,8 @@ function renderViewText() {
   document.getElementById('spreadValue').textContent = s.current_spread == null ? '—' : `${s.current_spread >= 0 ? '+' : ''}${fmt.format(s.current_spread)}`;
   document.getElementById('spreadValue').className = `spread-value ${cls(s.current_spread)}`;
   document.getElementById('spreadPercent').textContent = `相对近月 ${pct(s.current_spread_percentage)}`;
+  document.getElementById('quoteLabel').textContent =
+    `Settlement & Bid-Ask Gap · Quote ${s.quote_date || VIEW.business_date} · Gap = Ask − Bid`;
   document.getElementById('contractStrip').innerHTML = VIEW.contracts.map(c => `
     <div class="contract-cell">
       <div class="contract-code" style="color:${c.color}">${c.symbol}</div>
