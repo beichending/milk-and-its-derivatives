@@ -189,6 +189,8 @@ class DashboardTests(unittest.TestCase):
             self.assertIn('"distant_symbol":"BTRF27"', content)
             self.assertIn("spreadChart", content)
             self.assertIn("asOfDate", content)
+            self.assertIn("最近六个合约 · Bid / Ask / Gap", content)
+            self.assertIn("暂无有效双边报价", content)
             self.assertIn("业务含义", content)
             self.assertIn("观察重点", content)
             self.assertNotIn("__DATA__", content)
