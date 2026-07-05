@@ -7,3 +7,8 @@
 
 GitHub Actions refreshes both SGX dairy datasets and publishes both dashboards
 on weekdays at 19:45 China/Singapore time.
+
+Published pages:
+
+- BTR Butter: https://beichending.github.io/milk-and-its-derivatives/btr/
+- WMP: https://beichending.github.io/milk-and-its-derivatives/wmp/
