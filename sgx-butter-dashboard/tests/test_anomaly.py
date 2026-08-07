@@ -59,11 +59,12 @@ class AnomalyTests(unittest.TestCase):
 
     def test_missing_settlement_is_critical(self):
         connection = collector.connect_database(pathlib.Path(":memory:"))
+        config = dict(collector.DEFAULT_CONFIG, stale_business_days=9999)
         alerts = collector.detect_anomalies(
             connection,
             [{"symbol": "BTRN26", "delivery-month": "2026-07"}],
             "2026-06-19",
-            collector.DEFAULT_CONFIG,
+            config,
         )
         self.assertEqual(alerts[0]["rule"], "missing_settlement")
         self.assertEqual(alerts[0]["severity"], "critical")

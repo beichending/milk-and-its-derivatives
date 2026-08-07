@@ -4,12 +4,10 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "sgx-butter-dashboard/*.py"
-      - "sgx-butter-dashboard/config.example.json"
-      - "sgx-butter-dashboard/tests/**"
-      - "sgx-wmp-dashboard/*.py"
-      - "sgx-wmp-dashboard/config.example.json"
-      - "sgx-wmp-dashboard/tests/**"
+      - "sgx-*-dashboard/*.py"
+      - "sgx-*-dashboard/config.example.json"
+      - "sgx-*-dashboard/tests/**"
+      - "site-index.html"
       - ".github/workflows/sgx-butter-pages.yml"
   workflow_dispatch:
   schedule:
@@ -39,8 +37,15 @@ jobs:
 
       - name: Prepare public configuration
         run: |
-          cp sgx-butter-dashboard/config.example.json sgx-butter-dashboard/config.json
-          cp sgx-wmp-dashboard/config.example.json sgx-wmp-dashboard/config.json
+          for dashboard in \
+            sgx-butter-dashboard \
+            sgx-wmp-dashboard \
+            sgx-smp-dashboard \
+            sgx-amf-dashboard \
+            sgx-milkprice-dashboard
+          do
+            cp "$dashboard/config.example.json" "$dashboard/config.json"
+          done
 
       - name: Collect SGX Butter data and rebuild dashboard
         working-directory: sgx-butter-dashboard
@@ -50,6 +55,18 @@ jobs:
         working-directory: sgx-wmp-dashboard
         run: python sgx_wmp_collector.py --config config.json collect --no-notify
 
+      - name: Collect SGX SMP data and rebuild dashboard
+        working-directory: sgx-smp-dashboard
+        run: python sgx_smp_collector.py --config config.json collect --no-notify
+
+      - name: Collect SGX AMF data and rebuild dashboard
+        working-directory: sgx-amf-dashboard
+        run: python sgx_amf_collector.py --config config.json collect --no-notify
+
+      - name: Collect SGX Milk Price data and rebuild dashboard
+        working-directory: sgx-milkprice-dashboard
+        run: python sgx_mkp_collector.py --config config.json collect --no-notify
+
       - name: Persist the updated public market-data snapshot
         run: |
           git config user.name "github-actions[bot]"
@@ -58,65 +75,25 @@ jobs:
             sgx-butter-dashboard/dashboard.html \
             sgx-butter-dashboard/data/sgx_butter.sqlite3 \
             sgx-wmp-dashboard/dashboard.html \
-            sgx-wmp-dashboard/data/sgx_wmp.sqlite3
+            sgx-wmp-dashboard/data/sgx_wmp.sqlite3 \
+            sgx-smp-dashboard/dashboard.html \
+            sgx-smp-dashboard/data/sgx_smp.sqlite3 \
+            sgx-amf-dashboard/dashboard.html \
+            sgx-amf-dashboard/data/sgx_amf.sqlite3 \
+            sgx-milkprice-dashboard/dashboard.html \
+            sgx-milkprice-dashboard/data/sgx_mkp.sqlite3
           git diff --cached --quiet || git commit -m "data: refresh SGX dairy dashboards"
           git push
 
       - name: Prepare Pages site
         run: |
-          mkdir -p _site/btr _site/wmp
+          mkdir -p _site/btr _site/wmp _site/smp _site/amf _site/milkprice
+          cp site-index.html _site/index.html
           cp sgx-butter-dashboard/dashboard.html _site/btr/index.html
           cp sgx-wmp-dashboard/dashboard.html _site/wmp/index.html
-          cat > _site/index.html <<'HTML'
-          <!doctype html>
-          <html lang="en">
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <meta http-equiv="refresh" content="0; url=./btr/">
-              <title>SGX Dairy Futures Dashboards</title>
-              <style>
-                body {
-                  margin: 0;
-                  min-height: 100vh;
-                  display: grid;
-                  place-items: center;
-                  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                  color: #101828;
-                  background: #f5f7fb;
-                }
-                main {
-                  width: min(560px, calc(100vw - 40px));
-                  padding: 32px;
-                  border: 1px solid #d9e2f3;
-                  border-radius: 20px;
-                  background: #ffffff;
-                  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.08);
-                }
-                h1 { margin: 0 0 12px; font-size: 24px; }
-                p { margin: 0 0 20px; color: #475467; line-height: 1.5; }
-                a {
-                  display: inline-flex;
-                  margin-right: 12px;
-                  padding: 10px 14px;
-                  border-radius: 10px;
-                  color: #1849a9;
-                  background: #eef4ff;
-                  text-decoration: none;
-                  font-weight: 700;
-                }
-              </style>
-            </head>
-            <body>
-              <main>
-                <h1>SGX Dairy Futures Dashboards</h1>
-                <p>Redirecting to the BTR dashboard. If it does not open automatically, choose a dashboard below.</p>
-                <a href="./btr/">BTR Butter</a>
-                <a href="./wmp/">WMP</a>
-              </main>
-            </body>
-          </html>
-          HTML
+          cp sgx-smp-dashboard/dashboard.html _site/smp/index.html
+          cp sgx-amf-dashboard/dashboard.html _site/amf/index.html
+          cp sgx-milkprice-dashboard/dashboard.html _site/milkprice/index.html
           touch _site/.nojekyll
 
       - name: Configure GitHub Pages

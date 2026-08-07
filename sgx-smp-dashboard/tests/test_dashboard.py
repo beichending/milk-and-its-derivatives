@@ -9,7 +9,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
-    "dashboard", ROOT / "sgx_wmp_dashboard.py"
+    "dashboard", ROOT / "sgx_smp_dashboard.py"
 )
 dashboard = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader
@@ -40,18 +40,18 @@ class DashboardTests(unittest.TestCase):
             """
         )
         self.symbols = [
-            ("WMPN26", "2026-07"),
-            ("WMPQ26", "2026-08"),
-            ("WMPU26", "2026-09"),
-            ("WMPV26", "2026-10"),
-            ("WMPX26", "2026-11"),
-            ("WMPZ26", "2026-12"),
-            ("WMPF27", "2027-01"),
-            ("WMPG27", "2027-02"),
-            ("WMPH27", "2027-03"),
-            ("WMPJ27", "2027-04"),
-            ("WMPK27", "2027-05"),
-            ("WMPM27", "2027-06"),
+            ("SMPN26", "2026-07"),
+            ("SMPQ26", "2026-08"),
+            ("SMPU26", "2026-09"),
+            ("SMPV26", "2026-10"),
+            ("SMPX26", "2026-11"),
+            ("SMPZ26", "2026-12"),
+            ("SMPF27", "2027-01"),
+            ("SMPG27", "2027-02"),
+            ("SMPH27", "2027-03"),
+            ("SMPJ27", "2027-04"),
+            ("SMPK27", "2027-05"),
+            ("SMPM27", "2027-06"),
         ]
         for index, (symbol, delivery_month) in enumerate(self.symbols, start=1):
             self.connection.execute(
@@ -64,8 +64,8 @@ class DashboardTests(unittest.TestCase):
                     delivery_month,
                     5000 + index,
                     5000 + index,
-                    4995 if symbol == "WMPN26" else None,
-                    5005 if symbol == "WMPN26" else None,
+                    4995 if symbol == "SMPN26" else None,
+                    5005 if symbol == "SMPN26" else None,
                     index,
                     100,
                 ),
@@ -101,7 +101,7 @@ class DashboardTests(unittest.TestCase):
                             "best-bid-price-abs": 4995,
                             "best-ask-price-abs": 5005,
                         }
-                        if symbol == "WMPN26"
+                        if symbol == "SMPN26"
                         else {}
                     ),
                 ),
@@ -110,7 +110,7 @@ class DashboardTests(unittest.TestCase):
             """
             INSERT INTO history
             (business_date, symbol, settlement, volume, open_interest)
-            VALUES ('2026-05-20', 'WMPM26', 4990, 2, 90)
+            VALUES ('2026-05-20', 'SMPM26', 4990, 2, 90)
             """
         )
         self.connection.commit()
@@ -123,9 +123,9 @@ class DashboardTests(unittest.TestCase):
             self.connection, business_date="2026-06-19", days=30
         )
         self.assertEqual(len(payload["contracts"]), 12)
-        self.assertEqual(payload["contracts"][0]["symbol"], "WMPN26")
-        self.assertEqual(payload["contracts"][-1]["symbol"], "WMPM27")
-        self.assertEqual(payload["distant_contract"]["symbol"], "WMPF27")
+        self.assertEqual(payload["contracts"][0]["symbol"], "SMPN26")
+        self.assertEqual(payload["contracts"][-1]["symbol"], "SMPM27")
+        self.assertEqual(payload["distant_contract"]["symbol"], "SMPF27")
         self.assertEqual(payload["summary"]["distant_delivery_month"], "2027-01")
         self.assertEqual(payload["summary"]["current_spread"], 6)
         self.assertEqual(payload["spread_series"][-1]["spread"], 6)
@@ -135,7 +135,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["two_sided_quote_count"], 1)
         self.assertIn("2026-06-19", payload["available_dates"])
         self.assertEqual(
-            payload["views"]["2026-06-19"]["summary"]["front_symbol"], "WMPN26"
+            payload["views"]["2026-06-19"]["summary"]["front_symbol"], "SMPN26"
         )
         self.assertIn("Best estimate", payload["estimate"]["headline"])
 
@@ -148,11 +148,11 @@ class DashboardTests(unittest.TestCase):
             """
             INSERT INTO history
             (business_date, symbol, settlement, volume, open_interest)
-            VALUES ('2025-11-20', 'WMPZ25', 4790, 1, 60)
+            VALUES ('2025-11-20', 'SMPZ25', 4790, 1, 60)
             """
         )
         for index, symbol in enumerate(
-            ["WMPF26", "WMPG26", "WMPH26", "WMPJ26", "WMPK26", "WMPM26", "WMPN26", "WMPQ26", "WMPU26", "WMPV26", "WMPX26", "WMPZ26"],
+            ["SMPF26", "SMPG26", "SMPH26", "SMPJ26", "SMPK26", "SMPM26", "SMPN26", "SMPQ26", "SMPU26", "SMPV26", "SMPX26", "SMPZ26"],
             start=1,
         ):
             self.connection.execute(
@@ -167,10 +167,10 @@ class DashboardTests(unittest.TestCase):
         payload = dashboard.build_payload(
             self.connection, business_date="2025-12-19", days=30
         )
-        self.assertEqual(payload["summary"]["front_symbol"], "WMPF26")
-        self.assertEqual(payload["summary"]["distant_symbol"], "WMPN26")
+        self.assertEqual(payload["summary"]["front_symbol"], "SMPF26")
+        self.assertEqual(payload["summary"]["distant_symbol"], "SMPN26")
         self.assertEqual(len(payload["contracts"]), 12)
-        self.assertEqual(payload["contracts"][-1]["symbol"], "WMPZ26")
+        self.assertEqual(payload["contracts"][-1]["symbol"], "SMPZ26")
 
     def test_incomplete_requested_date_falls_back_to_latest_complete_date(self):
         for index, (symbol, _) in enumerate(self.symbols, start=1):
@@ -211,7 +211,7 @@ class DashboardTests(unittest.TestCase):
             (
                 1,
                 "2026-06-19",
-                "WMPN26",
+                "SMPN26",
                 "critical",
                 "volume_spike",
                 "diagnostic volume alert",
@@ -258,9 +258,9 @@ class DashboardTests(unittest.TestCase):
                 self.connection, path, business_date="2026-06-19", days=30
             )
             content = path.read_text(encoding="utf-8")
-            self.assertIn("SGX Whole Milk Powder Futures Dashboard", content)
-            self.assertIn('"front_symbol":"WMPN26"', content)
-            self.assertIn('"distant_symbol":"WMPF27"', content)
+            self.assertIn("SGX Skim Milk Powder Futures Dashboard", content)
+            self.assertIn('"front_symbol":"SMPN26"', content)
+            self.assertIn('"distant_symbol":"SMPF27"', content)
             self.assertIn("spreadChart", content)
             self.assertIn("asOfDate", content)
             self.assertIn('id="refreshButton"', content)
@@ -277,7 +277,7 @@ class DashboardTests(unittest.TestCase):
             """
             INSERT INTO history
             (business_date, symbol, settlement, volume, open_interest)
-            VALUES ('2026-06-18', 'WMPN26', 0, 8, 100)
+            VALUES ('2026-06-18', 'SMPN26', 0, 8, 100)
             """
         )
         self.connection.commit()

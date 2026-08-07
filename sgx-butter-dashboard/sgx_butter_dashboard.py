@@ -15,7 +15,13 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 
-COLORS = ["#175CD3", "#0E9384", "#F79009", "#7A5AF8", "#D92D20", "#667085"]
+COLORS = [
+    "#175CD3", "#0E9384", "#F79009", "#7A5AF8",
+    "#D92D20", "#667085", "#2E90FA", "#12B76A",
+    "#FDB022", "#9E77ED", "#F04438", "#475467",
+]
+DISPLAY_CONTRACT_MONTHS = 12
+SPREAD_CONTRACT_MONTHS = 6
 DATA_QUALITY_ALERT_RULES = {
     "stale_market_data",
     "duplicate_contract",
@@ -167,11 +173,7 @@ def make_estimate(
         action = "延续区间整理"
 
     front_price = contracts[0]["settlement"] if contracts else None
-    back_price = (
-        distant_contract["settlement"]
-        if distant_contract is not None
-        else contracts[-1]["settlement"] if contracts else None
-    )
+    back_price = distant_contract["settlement"] if distant_contract is not None else None
     curve_change = pct_change(back_price, front_price)
     if curve_change is None:
         curve_text = "期限结构信号不足"
@@ -180,7 +182,7 @@ def make_estimate(
     elif curve_change >= 0.01:
         curve_text = f"6 个月远月较近月升水 {curve_change:.1%}，曲线呈正向结构"
     else:
-        curve_text = "前六个合约期限结构较平"
+        curve_text = "前 12 个月合约期限结构较平"
 
     volume_points = [
         point["volume"]
@@ -363,18 +365,16 @@ def build_historical_view(
         if current is not None:
             candidates.append((delivery_month, symbol, all_points, current))
     candidates.sort(key=lambda item: (item[0], item[1]))
-    if len(candidates) < 6:
+    if not candidates:
         return None
-    if month_distance(candidates[0][0], selected_month) > 1:
+    if month_distance(candidates[0][0], selected_month) > DISPLAY_CONTRACT_MONTHS:
         return None
 
-    front_six = candidates[:6]
-    distant_delivery_month = add_months(front_six[0][0], 6)
+    display_contracts = candidates[:DISPLAY_CONTRACT_MONTHS]
+    distant_delivery_month = add_months(display_contracts[0][0], SPREAD_CONTRACT_MONTHS)
     distant_candidate = next(
         (item for item in candidates if item[0] == distant_delivery_month), None
     )
-    if distant_candidate is None:
-        return None
 
     def make_contract(
         candidate: tuple[str, str, list[dict[str, Any]], dict[str, Any]],
@@ -423,17 +423,21 @@ def build_historical_view(
 
     contracts: list[dict[str, Any]] = []
     series: list[dict[str, Any]] = []
-    for index, candidate in enumerate(front_six):
-        contract, contract_series_data = make_contract(candidate, COLORS[index])
+    for index, candidate in enumerate(display_contracts):
+        contract, contract_series_data = make_contract(candidate, COLORS[index % len(COLORS)])
         contracts.append(contract)
         series.append(contract_series_data)
 
-    distant_contract, distant_series = make_contract(distant_candidate, "#7A5AF8")
+    distant_contract: dict[str, Any] | None = None
+    distant_series_points: list[dict[str, Any]] = []
+    if distant_candidate is not None:
+        distant_contract, distant_series = make_contract(distant_candidate, "#7A5AF8")
+        distant_series_points = distant_series["points"]
     front_by_date = {
         point["date"]: point["settlement"] for point in series[0]["points"]
     }
     spread_series: list[dict[str, Any]] = []
-    for point in distant_series["points"]:
+    for point in distant_series_points:
         front_price = front_by_date.get(point["date"])
         distant_price = point["settlement"]
         if front_price is None or distant_price is None:
@@ -463,14 +467,17 @@ def build_historical_view(
             "front_delivery_month": contracts[0]["delivery_month"],
             "front_settlement": contracts[0]["settlement"],
             "front_daily_change": contracts[0]["daily_change"],
-            "distant_symbol": distant_contract["symbol"],
-            "distant_delivery_month": distant_delivery_month,
-            "distant_settlement": distant_contract["settlement"],
-            "distant_daily_change": distant_contract["daily_change"],
+            "distant_symbol": distant_contract["symbol"] if distant_contract else None,
+            "distant_delivery_month": distant_delivery_month if distant_contract else None,
+            "distant_settlement": distant_contract["settlement"] if distant_contract else None,
+            "distant_daily_change": distant_contract["daily_change"] if distant_contract else None,
             "current_spread": spread_series[-1]["spread"] if spread_series else None,
             "current_spread_percentage": (
                 spread_series[-1]["spread_percentage"] if spread_series else None
             ),
+            "contract_count": len(contracts),
+            "display_contract_months": DISPLAY_CONTRACT_MONTHS,
+            "spread_contract_months": SPREAD_CONTRACT_MONTHS,
             "total_volume": sum(item["volume"] for item in contracts),
             "total_open_interest": sum(item["open_interest"] for item in contracts),
             "breadth_up": sum(1 for value in daily_changes if value > 0),
@@ -482,7 +489,7 @@ def build_historical_view(
         "contracts": contracts,
         "series": series,
         "distant_contract": distant_contract,
-        "distant_series": distant_series["points"],
+        "distant_series": distant_series_points,
         "spread_series": spread_series,
         "alerts": selected_alerts,
         "estimate": estimate,
@@ -686,7 +693,7 @@ def build_payload(
             continue
         views[selected_date] = compact_view(view)
     if not views:
-        raise RuntimeError("No complete front/six-month historical views available")
+        raise RuntimeError("No forward contract historical views available")
     latest_snapshot_date, _ = load_latest_snapshot_quotes(connection)
     requested_date = business_date or max(
         date for date in (max(views), latest_snapshot_date) if date
@@ -724,6 +731,8 @@ def build_payload(
             "business_date": target_date,
             "generated_at": generated_at,
             "contract_count": len(full_current_view["contracts"]),
+            "display_contract_months": DISPLAY_CONTRACT_MONTHS,
+            "spread_contract_months": SPREAD_CONTRACT_MONTHS,
             "history_days": days,
             "source_url": "https://www.sgx.com/derivatives/products/dairy?cc=BTR",
             "data_status": "正常" if lag <= 2 else "数据陈旧",
@@ -797,12 +806,19 @@ HTML_TEMPLATE = r"""<!doctype html>
     .range button.active { background:#fff; color:var(--navy); box-shadow:0 1px 2px rgba(16,24,40,.12); }
     .chart-wrap { height:286px; padding:12px 14px 5px; position:relative; }
     canvas { width:100%; height:100%; display:block; }
-    .legend { display:flex; flex-wrap:wrap; gap:8px 16px; padding:0 20px 16px; }
+    .legend { display:flex; flex-wrap:wrap; gap:8px 14px; padding:0 20px 16px; }
     .legend-item { display:flex; align-items:center; gap:6px; color:var(--ink); font-size:11px; }
-    .swatch { width:8px; height:8px; border-radius:2px; }
+    .price-selector { align-items:center; gap:8px; }
+    .selector-action { border:1px solid #D0D5DD; border-radius:999px; background:#fff; color:#344054; padding:4px 9px; font:700 10px inherit; cursor:pointer; }
+    .selector-action:hover { border-color:#84ADFF; color:var(--blue); background:#F5F8FF; }
+    .selector-pill { display:flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid #EAECF0; border-radius:999px; background:#fff; color:var(--ink); font-size:11px; cursor:pointer; user-select:none; }
+    .selector-pill input { accent-color:var(--blue); margin:0; }
+    .selector-pill.off { color:#98A2B3; background:#F9FAFB; }
+    .swatch { width:8px; height:8px; border-radius:2px; flex:0 0 auto; }
     .contract-strip { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); border-top:1px solid #F2F4F7; }
     .contract-cell { padding:12px 12px 13px; border-right:1px solid #F2F4F7; min-width:0; }
-    .contract-cell:last-child { border-right:0; }
+    .contract-cell:nth-child(6n) { border-right:0; }
+    .contract-cell:nth-child(n+7) { border-top:1px solid #F2F4F7; }
     .contract-code { font-size:11px; font-weight:700; white-space:nowrap; }
     .contract-price { font-size:14px; font-weight:700; margin-top:5px; }
     .contract-change { font-size:10px; margin-top:3px; }
@@ -855,8 +871,9 @@ HTML_TEMPLATE = r"""<!doctype html>
       .asof-control select { flex:1; }
       .kpis { grid-template-columns:repeat(2,1fr); }
       .contract-strip { grid-template-columns:repeat(3,1fr); }
-      .contract-cell:nth-child(3) { border-right:0; }
-      .contract-cell:nth-child(-n+3) { border-bottom:1px solid #F2F4F7; }
+      .contract-cell:nth-child(6n) { border-right:1px solid #F2F4F7; }
+      .contract-cell:nth-child(3n) { border-right:0; }
+      .contract-cell:nth-child(n+4) { border-top:1px solid #F2F4F7; }
       .panel-head { padding:16px; } .chart-wrap { height:250px; }
     }
   </style>
@@ -868,7 +885,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     <div>
       <div class="eyebrow">Daily Market Monitor · BTR</div>
       <h1>SGX Butter Futures Dashboard</h1>
-      <div class="subtitle">最近六个活跃合约 · 结算价、成交量、期限结构与异常信号</div>
+      <div class="subtitle">未来 12 个月合约 · 结算价、成交量、期限结构与异常信号</div>
     </div>
     <div class="meta">
       <div class="meta-head">
@@ -885,7 +902,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       <div class="asof-icon">↶</div>
       <div>
         <div class="asof-title">历史回溯</div>
-        <div class="asof-note">选择历史交易日，近月、+6M 远月、价格、成交量、Spread 与判断将同步滚动</div>
+        <div class="asof-note">选择历史交易日，近月、+6M 远月、未来 12 个月合约、价格、成交量、Spread 与判断将同步滚动</div>
       </div>
     </div>
     <div class="asof-control">
@@ -902,7 +919,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         <div class="panel-head">
           <div>
             <h2 class="panel-title">01 · 日度结算价走势</h2>
-            <div class="panel-note">前六个交割月；价格口径为 daily settlement price</div>
+            <div class="panel-note">从所选日期起未来 12 个月交割月；可勾选显示合约，价格口径为 daily settlement price</div>
           </div>
           <div class="range" data-chart="price">
             <button data-days="30">30D</button><button data-days="60" class="active">60D</button><button data-days="120">120D</button>
@@ -918,7 +935,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         <div class="panel-head">
           <div>
             <h2 class="panel-title">02 · 日度成交量与远近月 Spread</h2>
-            <div class="panel-note">成交量为六个近月合约的 total-volume；Spread = 6 个月远月结算价 − 近月结算价</div>
+            <div class="panel-note">成交量为未来 12 个月合约的 total-volume；Spread = 6 个月远月结算价 − 近月结算价</div>
           </div>
           <div class="range" data-chart="volume">
             <button data-days="30" class="active">30D</button><button data-days="60">60D</button><button data-days="120">120D</button>
@@ -971,7 +988,7 @@ const shortDate = s => s ? s.slice(5).replace('-', '/') : '—';
 const monthLabel = s => s ? s.replace('-', '/') : '—';
 
 document.getElementById('generatedAt').textContent = DATA.meta.generated_at.replace('T',' ').slice(0,16);
-const state = {priceDays:60, volumeDays:30};
+const state = {priceDays:60, volumeDays:30, priceSymbols:null};
 const tooltip = document.getElementById('tooltip');
 const chartHit = new Map();
 let VIEW = null;
@@ -989,6 +1006,27 @@ function hydrateView(date) {
   });
   return {...base, series, distant_series:distantSeries, spread_series:spreadSeries};
 }
+function currentContractSymbols() {
+  return VIEW.contracts.map(c => c.symbol);
+}
+function syncPriceSelectionForView() {
+  const symbols = currentContractSymbols();
+  const retained = (state.priceSymbols || symbols).filter(symbol => symbols.includes(symbol));
+  state.priceSymbols = retained.length ? retained : symbols.slice();
+}
+function selectedPriceSeries() {
+  const selected = new Set(state.priceSymbols || currentContractSymbols());
+  return VIEW.series.filter(series => selected.has(series.symbol));
+}
+function renderPriceSelector() {
+  const selected = new Set(state.priceSymbols || currentContractSymbols());
+  const controls = [
+    `<button class=\"selector-action\" data-select-contracts=\"all\" type=\"button\">\u5168\u9009</button>`,
+    `<button class=\"selector-action\" data-select-contracts=\"front6\" type=\"button\">\u524d6</button>`
+  ].join('');
+  const pills = VIEW.contracts.map(c => `<label class=\"selector-pill ${selected.has(c.symbol) ? '' : 'off'}\"><input type=\"checkbox\" data-price-symbol=\"${c.symbol}\" ${selected.has(c.symbol) ? 'checked' : ''}><span class=\"swatch\" style=\"background:${c.color}\"></span>${c.symbol} \u00b7 ${monthLabel(c.delivery_month)}</label>`).join('');
+  document.getElementById('priceLegend').innerHTML = controls + pills;
+}
 
 function renderViewText() {
   const s = VIEW.summary, status = document.getElementById('dataStatus');
@@ -998,19 +1036,21 @@ function renderViewText() {
   status.querySelector('span:last-child').textContent = isLatest ? `数据${DATA.meta.data_status}` : '历史回溯';
   if (isLatest && DATA.meta.data_status !== '正常') status.classList.add('negative');
   if (!isLatest) status.classList.add('neutral');
+  const contractCount = s.contract_count || VIEW.contracts.length;
+  const contractLabel = contractCount === 12 ? '\u5341\u4e8c' : String(contractCount);
   const kpis = [
-    ['近月合约', s.front_symbol, monthLabel(s.front_delivery_month)],
-    ['近月结算价', fmt.format(s.front_settlement), `<span class="${cls(s.front_daily_change)}">${pct(s.front_daily_change)} 日变动</span>`],
-    ['远月合约 · +6M', s.distant_symbol || '—', monthLabel(s.distant_delivery_month)],
-    ['远月结算价', s.distant_settlement == null ? '—' : fmt.format(s.distant_settlement), `<span class="${cls(s.distant_daily_change)}">${pct(s.distant_daily_change)} 日变动</span>`],
-    ['六合约成交量', fmt.format(s.total_volume), '当日累计成交手数'],
-    ['六合约未平仓量', fmt.format(s.total_open_interest), 'Open interest · 非成交量'],
-    ['上涨 / 下跌', `${s.breadth_up} / ${s.breadth_down}`, '六个近月合约市场宽度'],
-    ['有效双边报价', `${s.two_sided_quote_count} / 6`, 'Bid 与 Ask 同时存在']
+    ['\u8fd1\u6708\u5408\u7ea6', s.front_symbol, monthLabel(s.front_delivery_month)],
+    ['\u8fd1\u6708\u7ed3\u7b97\u4ef7', fmt.format(s.front_settlement), `<span class="${cls(s.front_daily_change)}">${pct(s.front_daily_change)} \u65e5\u53d8\u52a8</span>`],
+    ['\u8fdc\u6708\u5408\u7ea6 \u00b7 +6M', s.distant_symbol || '\u2014', monthLabel(s.distant_delivery_month)],
+    ['\u8fdc\u6708\u7ed3\u7b97\u4ef7', s.distant_settlement == null ? '\u2014' : fmt.format(s.distant_settlement), `<span class="${cls(s.distant_daily_change)}">${pct(s.distant_daily_change)} \u65e5\u53d8\u52a8</span>`],
+    [`${contractLabel}\u5408\u7ea6\u6210\u4ea4\u91cf`, fmt.format(s.total_volume), '\u5f53\u65e5\u7d2f\u8ba1\u6210\u4ea4\u624b\u6570'],
+    [`${contractLabel}\u5408\u7ea6\u672a\u5e73\u4ed3\u91cf`, fmt.format(s.total_open_interest), 'Open interest \u00b7 \u975e\u6210\u4ea4\u91cf'],
+    ['\u4e0a\u6da8 / \u4e0b\u8dcc', `${s.breadth_up} / ${s.breadth_down}`, `${contractLabel}\u4e2a\u8fd1\u6708\u5408\u7ea6\u5e02\u573a\u5bbd\u5ea6`],
+    ['\u6709\u6548\u53cc\u8fb9\u62a5\u4ef7', `${s.two_sided_quote_count} / ${contractCount}`, 'Bid \u4e0e Ask \u540c\u65f6\u5b58\u5728']
   ];
   document.getElementById('kpis').innerHTML = kpis.map(x => `<div class="kpi"><div class="kpi-label">${x[0]}</div><div class="kpi-value">${x[1]}</div><div class="kpi-sub">${x[2]}</div></div>`).join('');
-  const legendHTML = VIEW.contracts.map(c => `<div class="legend-item"><span class="swatch" style="background:${c.color}"></span>${c.symbol} · ${monthLabel(c.delivery_month)}</div>`).join('');
-  document.getElementById('priceLegend').innerHTML = legendHTML;
+  renderPriceSelector();
+  const legendHTML = VIEW.contracts.map(c => `<div class="legend-item"><span class="swatch" style="background:${c.color}"></span>${c.symbol} \u00b7 ${monthLabel(c.delivery_month)}</div>`).join('');
   document.getElementById('volumeLegend').innerHTML = legendHTML;
   document.getElementById('spreadTitle').textContent = `${s.distant_symbol || '远月'} − ${s.front_symbol} 日度结算价差`;
   document.getElementById('spreadValue').textContent = s.current_spread == null ? '—' : `${s.current_spread >= 0 ? '+' : ''}${fmt.format(s.current_spread)}`;
@@ -1146,8 +1186,8 @@ function niceMax(v) {
   const p = Math.pow(10, Math.floor(Math.log10(v))), n = v/p;
   return (n<=1?1:n<=2?2:n<=5?5:10)*p;
 }
-function datesFor(days) {
-  const all = [...new Set(VIEW.series.flatMap(s=>s.points.map(p=>p.date)))].sort();
+function datesFor(days, sourceSeries=VIEW.series) {
+  const all = [...new Set(sourceSeries.flatMap(s=>s.points.map(p=>p.date)))].sort();
   return all.slice(-days);
 }
 function axes(ctx,w,h,min,max,dates,formatter) {
@@ -1159,14 +1199,14 @@ function axes(ctx,w,h,min,max,dates,formatter) {
   return {m,pw,ph,x:i=>m.l+pw*i/Math.max(1,dates.length-1),y:v=>m.t+ph*(max-v)/Math.max(.0001,max-min)};
 }
 function drawPrice() {
-  const canvas=document.getElementById('priceChart'), {ctx,w,h}=setupCanvas(canvas), dates=datesFor(state.priceDays);
+  const canvas=document.getElementById('priceChart'), selectedSeries=selectedPriceSeries(), {ctx,w,h}=setupCanvas(canvas), dates=datesFor(state.priceDays, selectedSeries);
   const mapIndex=new Map(dates.map((d,i)=>[d,i]));
-  const vals=VIEW.series.flatMap(s=>s.points.filter(p=>mapIndex.has(p.date)&&p.settlement!=null).map(p=>p.settlement));
-  if(!vals.length)return;
+  const vals=selectedSeries.flatMap(s=>s.points.filter(p=>mapIndex.has(p.date)&&p.settlement!=null).map(p=>p.settlement));
+  if(!vals.length){ctx.fillStyle='#667085';ctx.font='12px Segoe UI';ctx.textAlign='center';ctx.fillText('\u8bf7\u9009\u62e9\u81f3\u5c11\u4e00\u4e2a\u5408\u7ea6',w/2,h/2);ctx.textAlign='left';chartHit.set(canvas,[]);return;}
   let min=Math.min(...vals),max=Math.max(...vals),pad=(max-min)*.08||10;min-=pad;max+=pad;
   const a=axes(ctx,w,h,min,max,dates,v=>fmt.format(v));
   const hits=[];
-  VIEW.series.forEach(series=>{
+  selectedSeries.forEach(series=>{
     const byDate=new Map(series.points.map(p=>[p.date,p]));ctx.strokeStyle=series.color;ctx.lineWidth=1.8;ctx.beginPath();let started=false;
     dates.forEach((d,i)=>{const p=byDate.get(d);if(!p||p.settlement==null)return;const x=a.x(i),y=a.y(p.settlement);started?ctx.lineTo(x,y):(ctx.moveTo(x,y),started=true);hits.push({x,y,date:d,value:p.settlement,symbol:series.symbol,color:series.color,type:'price'});});
     ctx.stroke();
@@ -1185,7 +1225,7 @@ function drawSpread() {
   const canvas=document.getElementById('spreadChart'), {ctx,w,h}=setupCanvas(canvas), dates=datesFor(state.volumeDays);
   const byDate=new Map(VIEW.spread_series.map(p=>[p.date,p]));
   const values=dates.map(d=>byDate.get(d)?.spread).filter(v=>v!=null);
-  if(!values.length)return;
+  if(!values.length){ctx.fillStyle='#667085';ctx.font='12px Segoe UI';ctx.textAlign='center';ctx.fillText('\u6682\u65e0 +6M \u8fdc\u6708\u4ef7\u5dee',w/2,h/2);ctx.textAlign='left';chartHit.set(canvas,[]);return;}
   let min=Math.min(...values),max=Math.max(...values),pad=(max-min)*.12||Math.max(10,Math.abs(max)*.08);
   min-=pad;max+=pad;
   const a=axes(ctx,w,h,min,max,dates,v=>`${v>=0?'+':''}${fmt.format(v)}`);
@@ -1205,10 +1245,29 @@ document.querySelectorAll('.range button').forEach(btn=>btn.addEventListener('cl
   const group=btn.closest('.range');group.querySelectorAll('button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
   const days=Number(btn.dataset.days);if(group.dataset.chart==='price'){state.priceDays=days;drawPrice();}else{state.volumeDays=days;drawVolume();drawSpread();}
 }));
+const priceLegend = document.getElementById('priceLegend');
+priceLegend.addEventListener('change', ev => {
+  const input = ev.target.closest?.('input[data-price-symbol]');
+  if (!input) return;
+  const selected = new Set(state.priceSymbols || currentContractSymbols());
+  input.checked ? selected.add(input.dataset.priceSymbol) : selected.delete(input.dataset.priceSymbol);
+  state.priceSymbols = currentContractSymbols().filter(symbol => selected.has(symbol));
+  renderPriceSelector();
+  drawPrice();
+});
+priceLegend.addEventListener('click', ev => {
+  const button = ev.target.closest?.('[data-select-contracts]');
+  if (!button) return;
+  const symbols = currentContractSymbols();
+  state.priceSymbols = button.dataset.selectContracts === 'front6' ? symbols.slice(0, 6) : symbols.slice();
+  renderPriceSelector();
+  drawPrice();
+});
 bindTooltip(document.getElementById('priceChart'));bindTooltip(document.getElementById('volumeChart'));bindTooltip(document.getElementById('spreadChart'));
 function render(){drawPrice();drawVolume();drawSpread();}
 function applyView(date) {
   VIEW = hydrateView(date);
+  syncPriceSelectionForView();
   renderViewText();
   render();
 }

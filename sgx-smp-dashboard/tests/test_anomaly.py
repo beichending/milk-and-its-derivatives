@@ -7,7 +7,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
-    "collector", ROOT / "sgx_wmp_collector.py"
+    "collector", ROOT / "sgx_smp_collector.py"
 )
 collector = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader
@@ -40,7 +40,7 @@ class AnomalyTests(unittest.TestCase):
     def test_snapshot_preserves_every_field(self):
         connection = collector.connect_database(pathlib.Path(":memory:"))
         row = {
-            "symbol": "WMPN26",
+            "symbol": "SMPN26",
             "base-date": "20260619",
             "daily-settlement-price-abs": 5675,
             "custom-new-field": {"future": True},
@@ -51,7 +51,7 @@ class AnomalyTests(unittest.TestCase):
         field = connection.execute(
             """
             SELECT field_value, value_type FROM contract_fields
-            WHERE symbol='WMPN26' AND field_name='custom-new-field'
+            WHERE symbol='SMPN26' AND field_name='custom-new-field'
             """
         ).fetchone()
         self.assertEqual(field["value_type"], "json")
@@ -62,7 +62,7 @@ class AnomalyTests(unittest.TestCase):
         config = dict(collector.DEFAULT_CONFIG, stale_business_days=9999)
         alerts = collector.detect_anomalies(
             connection,
-            [{"symbol": "WMPN26", "delivery-month": "2026-07"}],
+            [{"symbol": "SMPN26", "delivery-month": "2026-07"}],
             "2026-06-19",
             config,
         )

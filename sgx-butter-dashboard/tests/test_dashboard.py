@@ -39,7 +39,7 @@ class DashboardTests(unittest.TestCase):
             );
             """
         )
-        symbols = [
+        self.symbols = [
             ("BTRN26", "2026-07"),
             ("BTRQ26", "2026-08"),
             ("BTRU26", "2026-09"),
@@ -47,8 +47,13 @@ class DashboardTests(unittest.TestCase):
             ("BTRX26", "2026-11"),
             ("BTRZ26", "2026-12"),
             ("BTRF27", "2027-01"),
+            ("BTRG27", "2027-02"),
+            ("BTRH27", "2027-03"),
+            ("BTRJ27", "2027-04"),
+            ("BTRK27", "2027-05"),
+            ("BTRM27", "2027-06"),
         ]
-        for index, (symbol, delivery_month) in enumerate(symbols, start=1):
+        for index, (symbol, delivery_month) in enumerate(self.symbols, start=1):
             self.connection.execute(
                 """
                 INSERT INTO snapshots VALUES
@@ -113,13 +118,13 @@ class DashboardTests(unittest.TestCase):
     def tearDown(self):
         self.connection.close()
 
-    def test_payload_uses_nearest_six_contracts(self):
+    def test_payload_uses_nearest_twelve_contracts(self):
         payload = dashboard.build_payload(
             self.connection, business_date="2026-06-19", days=30
         )
-        self.assertEqual(len(payload["contracts"]), 6)
+        self.assertEqual(len(payload["contracts"]), 12)
         self.assertEqual(payload["contracts"][0]["symbol"], "BTRN26")
-        self.assertEqual(payload["contracts"][-1]["symbol"], "BTRZ26")
+        self.assertEqual(payload["contracts"][-1]["symbol"], "BTRM27")
         self.assertEqual(payload["distant_contract"]["symbol"], "BTRF27")
         self.assertEqual(payload["summary"]["distant_delivery_month"], "2027-01")
         self.assertEqual(payload["summary"]["current_spread"], 6)
@@ -147,7 +152,7 @@ class DashboardTests(unittest.TestCase):
             """
         )
         for index, symbol in enumerate(
-            ["BTRF26", "BTRG26", "BTRH26", "BTRJ26", "BTRK26", "BTRM26"],
+            ["BTRF26", "BTRG26", "BTRH26", "BTRJ26", "BTRK26", "BTRM26", "BTRN26", "BTRQ26", "BTRU26", "BTRV26", "BTRX26", "BTRZ26"],
             start=1,
         ):
             self.connection.execute(
@@ -158,25 +163,17 @@ class DashboardTests(unittest.TestCase):
                 """,
                 (symbol, 4800 + index, index, 70 + index),
             )
-        self.connection.execute(
-            """
-            INSERT INTO history
-            (business_date, symbol, settlement, volume, open_interest)
-            VALUES ('2025-12-19', 'BTRN26', 4810, 7, 80)
-            """
-        )
         self.connection.commit()
         payload = dashboard.build_payload(
             self.connection, business_date="2025-12-19", days=30
         )
         self.assertEqual(payload["summary"]["front_symbol"], "BTRF26")
         self.assertEqual(payload["summary"]["distant_symbol"], "BTRN26")
+        self.assertEqual(len(payload["contracts"]), 12)
+        self.assertEqual(payload["contracts"][-1]["symbol"], "BTRZ26")
 
     def test_incomplete_requested_date_falls_back_to_latest_complete_date(self):
-        for index, symbol in enumerate(
-            ["BTRN26", "BTRQ26", "BTRU26", "BTRV26", "BTRX26", "BTRZ26"],
-            start=1,
-        ):
+        for index, (symbol, _) in enumerate(self.symbols, start=1):
             self.connection.execute(
                 """
                 INSERT INTO snapshots
@@ -200,7 +197,7 @@ class DashboardTests(unittest.TestCase):
         )
         self.assertEqual(payload["meta"]["business_date"], "2026-06-19")
         self.assertEqual(payload["summary"]["quote_date"], "2026-06-22")
-        self.assertEqual(payload["summary"]["two_sided_quote_count"], 6)
+        self.assertEqual(payload["summary"]["two_sided_quote_count"], 12)
         self.assertEqual(payload["contracts"][0]["bid"], 5091)
         self.assertEqual(payload["contracts"][0]["ask"], 5111)
         self.assertEqual(payload["contracts"][0]["bid_ask_gap"], 20)
@@ -268,6 +265,8 @@ class DashboardTests(unittest.TestCase):
             self.assertIn("asOfDate", content)
             self.assertIn('id="refreshButton"', content)
             self.assertIn("url.searchParams.set('_refresh'", content)
+            self.assertIn("data-price-symbol", content)
+            self.assertIn("\"contract_count\":12", content)
             self.assertIn("Alert 展示口径", content)
             self.assertIn("业务含义", content)
             self.assertIn("观察重点", content)
@@ -303,7 +302,7 @@ class DashboardTests(unittest.TestCase):
                 {
                     "daily_change": 0.05 if spike and contract_index == 0 else 0.001,
                 }
-                for contract_index in range(6)
+                for contract_index in range(12)
             ]
             views[business_date] = {
                 "summary": {

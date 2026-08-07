@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a self-contained SGX Whole Milk Powder Futures business dashboard."""
+"""Generate a self-contained SGX NZ Milk Price Futures business dashboard."""
 
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ def month_distance(left: str, right: str) -> int:
 
 
 def delivery_month_from_symbol(symbol: str) -> str | None:
-    if len(symbol) < 6 or not symbol.startswith("WMP"):
+    if len(symbol) < 6 or not symbol.startswith("MKP"):
         return None
     month = MONTH_CODE_TO_NUMBER.get(symbol[-3])
     try:
@@ -666,7 +666,7 @@ def build_payload(
     connection.row_factory = sqlite3.Row
     history = load_history_universe(connection)
     if not history:
-        raise RuntimeError("No SGX Whole Milk Powder history available")
+        raise RuntimeError("No SGX NZ Milk Price history available")
     alert_rows = connection.execute(
         """
         SELECT created_at, business_date, symbol, severity, rule, message,
@@ -727,14 +727,14 @@ def build_payload(
     )
     return {
         "meta": {
-            "title": "SGX-NZX Global Whole Milk Powder Futures",
+            "title": "SGX-NZX NZ Milk Price Futures",
             "business_date": target_date,
             "generated_at": generated_at,
             "contract_count": len(full_current_view["contracts"]),
             "display_contract_months": DISPLAY_CONTRACT_MONTHS,
             "spread_contract_months": SPREAD_CONTRACT_MONTHS,
             "history_days": days,
-            "source_url": "https://www.sgx.com/derivatives/products/dairy?cc=WMP",
+            "source_url": "https://www.sgx.com/derivatives/products/dairy?cc=MKP",
             "data_status": "正常" if lag <= 2 else "数据陈旧",
             "business_day_lag": lag,
             "volume_definition": "SGX total-volume：该合约当日累计成交手数",
@@ -753,7 +753,7 @@ HTML_TEMPLATE = r"""<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SGX Whole Milk Powder Futures Monitor</title>
+  <title>SGX NZ Milk Price Futures Monitor</title>
   <style>
     :root {
       --navy:#101828; --ink:#344054; --muted:#667085; --line:#E4E7EC;
@@ -883,8 +883,8 @@ HTML_TEMPLATE = r"""<!doctype html>
 <main class="shell">
   <header>
     <div>
-      <div class="eyebrow">Daily Market Monitor · WMP</div>
-      <h1>SGX Whole Milk Powder Futures Dashboard</h1>
+      <div class="eyebrow">Daily Market Monitor · MKP</div>
+      <h1>SGX NZ Milk Price Futures Dashboard</h1>
       <div class="subtitle">未来 12 个月合约 · 结算价、成交量、期限结构与异常信号</div>
     </div>
     <div class="meta">
@@ -974,7 +974,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   </div>
 
   <footer>
-    <span>Source: SGX public derivatives data · Contract code WMP</span>
+    <span>Source: SGX public derivatives data · Contract code MKP</span>
     <span>For monitoring and research use only</span>
   </footer>
 </main>
@@ -1325,7 +1325,7 @@ def generate_dashboard(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--database", default="data/sgx_wmp.sqlite3")
+    parser.add_argument("--database", default="data/sgx_mkp.sqlite3")
     parser.add_argument("--output", default="dashboard.html")
     parser.add_argument("--business-date")
     parser.add_argument("--days", type=int, default=120)
