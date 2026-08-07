@@ -496,11 +496,91 @@ def build_historical_view(
     }
 
 
+def slim_contract(contract: dict[str, Any] | None) -> dict[str, Any] | None:
+    if contract is None:
+        return None
+    return {
+        key: contract.get(key)
+        for key in (
+            "symbol",
+            "delivery_month",
+            "settlement",
+            "daily_change",
+            "bid",
+            "ask",
+            "bid_ask_gap",
+            "color",
+        )
+    }
+
+
 def compact_view(view: dict[str, Any]) -> dict[str, Any]:
     return {
-        key: value
-        for key, value in view.items()
-        if key not in {"series", "distant_series", "spread_series"}
+        "business_date": view["business_date"],
+        "summary": view["summary"],
+        "contracts": [slim_contract(contract) for contract in view["contracts"]],
+        "distant_contract": slim_contract(view.get("distant_contract")),
+        "alerts": view.get("alerts", []),
+        "estimate": view["estimate"],
+    }
+
+
+def compact_history_for_payload(
+    history: dict[str, list[dict[str, Any]]],
+    views: dict[str, dict[str, Any]],
+) -> dict[str, list[list[Any]]]:
+    used_symbols = {
+        contract["symbol"]
+        for view in views.values()
+        for contract in view.get("contracts", [])
+        if contract.get("symbol")
+    }
+    used_symbols.update(
+        summary["distant_symbol"]
+        for view in views.values()
+        if (summary := view.get("summary", {})).get("distant_symbol")
+    )
+    return {
+        symbol: [
+            [point["date"], point["settlement"], point["volume"]]
+            for point in points
+        ]
+        for symbol, points in history.items()
+        if symbol in used_symbols
+    }
+
+
+def contract_payload_row(contract: dict[str, Any] | None) -> list[Any] | None:
+    if contract is None:
+        return None
+    return [
+        contract.get("symbol"),
+        contract.get("delivery_month"),
+        contract.get("settlement"),
+        contract.get("daily_change"),
+        contract.get("bid"),
+        contract.get("ask"),
+        contract.get("bid_ask_gap"),
+        contract.get("color"),
+    ]
+
+
+def compact_views_for_payload(
+    views: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    return {
+        date: {
+            "business_date": view["business_date"],
+            "summary": view["summary"],
+            "contracts": [
+                contract_payload_row(contract)
+                for contract in view.get("contracts", [])
+            ],
+            "distant_contract": contract_payload_row(view.get("distant_contract")),
+            "alerts": view.get("alerts", []),
+            "estimate": view["estimate"],
+        }
+        for date, view in views.items()
     }
 
 
@@ -741,10 +821,10 @@ def build_payload(
             "open_interest_definition": "open-interest：未平仓合约总量，不是当日成交量",
         },
         "available_dates": list(views),
-        "views": views,
-        "history": history,
+        "views": compact_views_for_payload(views),
+        "history": compact_history_for_payload(history, views),
         "anomaly_stats": anomaly_stats,
-        **full_current_view,
+        **compact_view(full_current_view),
     }
 
 
@@ -992,10 +1072,22 @@ const state = {priceDays:60, volumeDays:30, priceSymbols:null};
 const tooltip = document.getElementById('tooltip');
 const chartHit = new Map();
 let VIEW = null;
+const CONTRACT_FIELDS = ['symbol','delivery_month','settlement','daily_change','bid','ask','bid_ask_gap','color'];
+function expandContract(contract) {
+  if (!Array.isArray(contract)) return contract;
+  return Object.fromEntries(CONTRACT_FIELDS.map((field,index) => [field, contract[index]]));
+}
+function normalizeView(base) {
+  return {
+    ...base,
+    contracts: (base.contracts || []).map(expandContract),
+    distant_contract: expandContract(base.distant_contract),
+  };
+}
 
 function hydrateView(date) {
-  const base = DATA.views[date];
-  const pointsFor = symbol => (DATA.history[symbol] || []).filter(p => p.date <= date).slice(-DATA.meta.history_days);
+  const base = normalizeView(DATA.views[date]);
+  const pointsFor = symbol => (DATA.history[symbol] || []).filter(p => p[0] <= date).slice(-DATA.meta.history_days).map(p => ({date:p[0], settlement:p[1], volume:p[2] || 0}));
   const series = base.contracts.map(c => ({symbol:c.symbol, delivery_month:c.delivery_month, color:c.color, points:pointsFor(c.symbol)}));
   const distantSeries = pointsFor(base.summary.distant_symbol);
   const frontByDate = new Map(series[0].points.map(p => [p.date,p.settlement]));

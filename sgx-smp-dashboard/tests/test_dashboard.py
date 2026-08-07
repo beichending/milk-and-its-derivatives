@@ -128,7 +128,6 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(payload["distant_contract"]["symbol"], "SMPF27")
         self.assertEqual(payload["summary"]["distant_delivery_month"], "2027-01")
         self.assertEqual(payload["summary"]["current_spread"], 6)
-        self.assertEqual(payload["spread_series"][-1]["spread"], 6)
         self.assertEqual(payload["contracts"][0]["bid"], 4995)
         self.assertEqual(payload["contracts"][0]["ask"], 5005)
         self.assertEqual(payload["contracts"][0]["bid_ask_gap"], 10)
@@ -286,11 +285,11 @@ class DashboardTests(unittest.TestCase):
         )
         zero_point = next(
             point
-            for point in payload["series"][0]["points"]
-            if point["date"] == "2026-06-18"
+            for point in payload["history"]["SMPN26"]
+            if point[0] == "2026-06-18"
         )
-        self.assertIsNone(zero_point["settlement"])
-        self.assertEqual(zero_point["volume"], 8)
+        self.assertIsNone(zero_point[1])
+        self.assertEqual(zero_point[2], 8)
 
     def test_calibrated_anomaly_rate_is_close_to_target(self):
         views = {}
