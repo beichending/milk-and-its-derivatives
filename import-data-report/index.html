@@ -4,48 +4,120 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>&#36827;&#21475;&#22270;&#34920;&#27719;&#24635;</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <style>
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: #fff; color: #003b68; font-family: Arial, "Microsoft YaHei", sans-serif; }
-.summary-page { padding: 18px 22px 30px; max-width: 1480px; margin: 0 auto; }
-.summary-top { position: sticky; top: 0; z-index: 5; background: rgba(255,255,255,.96); display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 6px 0 14px; border-bottom: 1px solid #d8e0e8; }
-h1 { font-size: 24px; font-weight: 500; margin: 0; color: #003b68; }
-.summary-top nav { display: flex; flex-wrap: wrap; gap: 10px; }
-.summary-top a, .summary-heading a { color: #003b68; text-decoration: none; border: 1px solid #d8e0e8; padding: 7px 12px; font-size: 14px; background: #fff; }
-.summary-section { padding-top: 20px; scroll-margin-top: 74px; }
-.summary-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.summary-heading h2 { margin: 0; font-size: 22px; font-weight: 500; color: #222; }
-iframe { width: 100%; height: 650px; border: 1px solid #d8e0e8; display: block; }
-@media (max-width: 1050px) {
-  .summary-top { position: static; align-items: flex-start; flex-direction: column; }
-  .summary-section { scroll-margin-top: 0; }
-  iframe { height: 1740px; }
+.page { max-width: 1500px; margin: 0 auto; padding: 18px 22px 32px; }
+.top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 8px 0 14px; background: rgba(255,255,255,.96); border-bottom: 1px solid #d8e0e8; }
+h1 { margin: 0; font-size: 24px; font-weight: 500; color: #003b68; }
+nav { display: flex; gap: 10px; flex-wrap: wrap; }
+nav a { color: #003b68; text-decoration: none; border: 1px solid #d8e0e8; padding: 7px 12px; font-size: 14px; background: #fff; }
+.product { padding-top: 22px; scroll-margin-top: 76px; }
+.product h2 { margin: 0 0 10px; font-size: 22px; font-weight: 500; color: #222; }
+.grid { display: grid; grid-template-columns: 220px 420px minmax(560px, 1fr); gap: 22px; }
+.panel { min-width: 0; }
+.panel + .panel { border-left: 1px solid #003b68; padding-left: 22px; }
+.title { height: 36px; font-size: 21px; line-height: 1.2; color: #222; white-space: nowrap; }
+.chart { width: 100%; height: 520px; }
+.source { margin-top: 8px; font-size: 12px; color: #565656; }
+@media (max-width: 1120px) {
+  .grid { grid-template-columns: 1fr; }
+  .panel + .panel { border-left: 0; border-top: 1px solid #003b68; padding-left: 0; padding-top: 18px; }
+  .title { height: auto; white-space: normal; margin-bottom: 8px; }
+  .chart { height: 430px; }
+  .top { position: static; align-items: flex-start; flex-direction: column; }
 }
 </style>
 </head>
 <body>
-<main class="summary-page">
-  <div class="summary-top"><h1>&#36827;&#21475;&#22270;&#34920;&#27719;&#24635;</h1><nav><a href="#cream">&#28129;&#22902;&#27833;</a><a href="#butter">&#40644;&#27833;</a><a href="#cheese">&#24178;&#37226;</a></nav></div>
-  <section id="cream" class="summary-section">
-  <div class="summary-heading">
-    <h2>&#28129;&#22902;&#27833;&#36827;&#21475;&#20998;&#26512;</h2>
-    <a href="cream.html">&#25171;&#24320;&#21333;&#39029;</a>
-  </div>
-  <iframe src="cream.html" title="&#28129;&#22902;&#27833;&#36827;&#21475;&#20998;&#26512;"></iframe>
-</section><section id="butter" class="summary-section">
-  <div class="summary-heading">
-    <h2>&#40644;&#27833;&#36827;&#21475;&#20998;&#26512;</h2>
-    <a href="butter.html">&#25171;&#24320;&#21333;&#39029;</a>
-  </div>
-  <iframe src="butter.html" title="&#40644;&#27833;&#36827;&#21475;&#20998;&#26512;"></iframe>
-</section><section id="cheese" class="summary-section">
-  <div class="summary-heading">
-    <h2>&#24178;&#37226;&#36827;&#21475;&#20998;&#26512;</h2>
-    <a href="cheese.html">&#25171;&#24320;&#21333;&#39029;</a>
-  </div>
-  <iframe src="cheese.html" title="&#24178;&#37226;&#36827;&#21475;&#20998;&#26512;"></iframe>
-</section>
+<main class="page">
+  <div class="top"><h1>&#36827;&#21475;&#22270;&#34920;&#27719;&#24635;</h1><nav><a href="#cream">&#28129;&#22902;&#27833;</a><a href="#butter">&#40644;&#27833;</a><a href="#cheese">&#24178;&#37226;</a></nav></div>
+  <div id="root"></div>
+  <div class="source">Source: generated from 20260903_160530.</div>
 </main>
+<script>
+const products = [{"key": "cream", "product": "Cream", "zh": "&#28129;&#22902;&#27833;", "years": [2024, 2025, 2026], "annual": [{"label": "2024", "kmt": 288.3}, {"label": "2025", "kmt": 264.5}, {"label": "2026YTD", "kmt": 152.5}], "monthly": [{"month": 1, "2024": 24.58, "2025": 22.66, "2026": 22.33}, {"month": 2, "2024": 15.03, "2025": 21.97, "2026": 21.92}, {"month": 3, "2024": 25.5, "2025": 21.49, "2026": 30.06}, {"month": 4, "2024": 24.5, "2025": 24.26, "2026": 24.65}, {"month": 5, "2024": 24.49, "2025": 29.63, "2026": 27.66}, {"month": 6, "2024": 22.8, "2025": 20.61, "2026": 25.84}, {"month": 7, "2024": 18.49, "2025": 22.45, "2026": null}, {"month": 8, "2024": 19.07, "2025": 10.22, "2026": null}, {"month": 9, "2024": 29.17, "2025": 20.99, "2026": null}, {"month": 10, "2024": 24.17, "2025": 20.38, "2026": null}, {"month": 11, "2024": 32.52, "2025": 25.97, "2026": null}, {"month": 12, "2024": 27.96, "2025": 23.86, "2026": null}], "categories": [{"name": "New Zealand", "color": "#4f6f9f"}, {"name": "France", "color": "#9ddbdd"}, {"name": "Ireland", "color": "#007a75"}, {"name": "Belgium", "color": "#f5a91d"}, {"name": "Spain", "color": "#f4a36b"}, {"name": "Others", "color": "#d1d5da"}], "stacked": [{"month": "2025-07", "totalKmt": 22.4, "parts": [{"name": "New Zealand", "kmt": 14.573, "share": 0.6492775790823054}, {"name": "France", "kmt": 3.93, "share": 0.1750949441206018}, {"name": "Ireland", "kmt": 0.971, "share": 0.04324666100051543}, {"name": "Belgium", "kmt": 0.646, "share": 0.028768392659736745}, {"name": "Spain", "kmt": 0.283, "share": 0.012625965273950927}, {"name": "Others", "kmt": 2.042, "share": 0.09098645786288984}]}, {"month": "2025-08", "totalKmt": 10.2, "parts": [{"name": "New Zealand", "kmt": 3.123, "share": 0.30557567965173904}, {"name": "France", "kmt": 3.006, "share": 0.29406970795596377}, {"name": "Ireland", "kmt": 0.943, "share": 0.09226878261387667}, {"name": "Belgium", "kmt": 0.77, "share": 0.0753059713240027}, {"name": "Spain", "kmt": 0.375, "share": 0.03669679622975588}, {"name": "Others", "kmt": 2.004, "share": 0.196083062224662}]}, {"month": "2025-09", "totalKmt": 21.0, "parts": [{"name": "New Zealand", "kmt": 14.937, "share": 0.7117172444402726}, {"name": "France", "kmt": 2.21, "share": 0.10532519286054458}, {"name": "Ireland", "kmt": 0.655, "share": 0.03121352111978116}, {"name": "Belgium", "kmt": 0.142, "share": 0.006742644306811043}, {"name": "Spain", "kmt": 0.045, "share": 0.0021381010386512045}, {"name": "Others", "kmt": 2.998, "share": 0.14286329623393937}]}, {"month": "2025-10", "totalKmt": 20.4, "parts": [{"name": "New Zealand", "kmt": 14.839, "share": 0.7281462597801797}, {"name": "France", "kmt": 2.482, "share": 0.12180303789970214}, {"name": "Ireland", "kmt": 0.7, "share": 0.03434151116172347}, {"name": "Belgium", "kmt": 0.521, "share": 0.025572556428350553}, {"name": "Spain", "kmt": 0.195, "share": 0.009572497938884199}, {"name": "Others", "kmt": 1.642, "share": 0.08056413679115992}]}, {"month": "2025-11", "totalKmt": 26.0, "parts": [{"name": "New Zealand", "kmt": 20.484, "share": 0.7886732440338813}, {"name": "France", "kmt": 1.727, "share": 0.06647792346336566}, {"name": "Ireland", "kmt": 0.957, "share": 0.03682995043084588}, {"name": "Belgium", "kmt": 1.17, "share": 0.0450543866181495}, {"name": "Spain", "kmt": 0.025, "share": 0.0009614907422490613}, {"name": "Others", "kmt": 1.61, "share": 0.062003004711508734}]}, {"month": "2025-12", "totalKmt": 23.9, "parts": [{"name": "New Zealand", "kmt": 17.572, "share": 0.7363167649522526}, {"name": "France", "kmt": 2.436, "share": 0.102094733811792}, {"name": "Ireland", "kmt": 0.654, "share": 0.027388343928733204}, {"name": "Belgium", "kmt": 0.443, "share": 0.018552949552319738}, {"name": "Spain", "kmt": 0.245, "share": 0.010263688640650213}, {"name": "Others", "kmt": 2.515, "share": 0.10538351911425219}]}, {"month": "2026-01", "totalKmt": 22.3, "parts": [{"name": "New Zealand", "kmt": 14.935, "share": 0.6687397184546325}, {"name": "France", "kmt": 3.465, "share": 0.1551416267972149}, {"name": "Ireland", "kmt": 0.195, "share": 0.008718092255632973}, {"name": "Belgium", "kmt": 0.939, "share": 0.042035773184525185}, {"name": "Spain", "kmt": 0.198, "share": 0.00888515372498494}, {"name": "Others", "kmt": 2.601, "share": 0.11647963558300946}]}, {"month": "2026-02", "totalKmt": 21.9, "parts": [{"name": "New Zealand", "kmt": 16.146, "share": 0.7366534525825043}, {"name": "France", "kmt": 1.86, "share": 0.08487200582096165}, {"name": "Ireland", "kmt": 0.364, "share": 0.01661271716597862}, {"name": "Belgium", "kmt": 0.358, "share": 0.016322955696561753}, {"name": "Spain", "kmt": 0.326, "share": 0.014869266523429936}, {"name": "Others", "kmt": 2.864, "share": 0.1306696022105637}]}, {"month": "2026-03", "totalKmt": 30.1, "parts": [{"name": "New Zealand", "kmt": 24.365, "share": 0.8105367573937695}, {"name": "France", "kmt": 1.863, "share": 0.06198972366712154}, {"name": "Ireland", "kmt": 0.457, "share": 0.015207020623921066}, {"name": "Belgium", "kmt": 0.261, "share": 0.008686161879687106}, {"name": "Spain", "kmt": 0.538, "share": 0.017900617672421047}, {"name": "Others", "kmt": 2.576, "share": 0.08567971876307959}]}, {"month": "2026-04", "totalKmt": 24.7, "parts": [{"name": "New Zealand", "kmt": 17.735, "share": 0.7194329813352476}, {"name": "France", "kmt": 3.418, "share": 0.13865512403279764}, {"name": "Ireland", "kmt": 0.309, "share": 0.012554098997453678}, {"name": "Belgium", "kmt": 0.58, "share": 0.023544918900789826}, {"name": "Spain", "kmt": 0.087, "share": 0.003508920239746604}, {"name": "Others", "kmt": 2.522, "share": 0.10230395649396488}]}, {"month": "2026-05", "totalKmt": 27.7, "parts": [{"name": "New Zealand", "kmt": 18.106, "share": 0.6545926575658405}, {"name": "France", "kmt": 4.72, "share": 0.1706305670577366}, {"name": "Ireland", "kmt": 0.703, "share": 0.025422890218233345}, {"name": "Belgium", "kmt": 0.88, "share": 0.031799383403315354}, {"name": "Spain", "kmt": 0.242, "share": 0.008735993427442187}, {"name": "Others", "kmt": 3.01, "share": 0.10881850832743216}]}, {"month": "2026-06", "totalKmt": 25.8, "parts": [{"name": "New Zealand", "kmt": 15.593, "share": 0.603527942950218}, {"name": "France", "kmt": 4.825, "share": 0.18675522900985844}, {"name": "Ireland", "kmt": 1.515, "share": 0.05865099971891893}, {"name": "Belgium", "kmt": 1.12, "share": 0.04333885457797159}, {"name": "Spain", "kmt": 0.282, "share": 0.010899032906148414}, {"name": "Others", "kmt": 2.502, "share": 0.09682794083688465}]}], "latestMonth": "2026-06", "latestMonthShort": "Jun"}, {"key": "butter", "product": "Butter", "zh": "&#40644;&#27833;", "years": [2024, 2025, 2026], "annual": [{"label": "2024", "kmt": 104.9}, {"label": "2025", "kmt": 113.4}, {"label": "2026YTD", "kmt": 66.0}], "monthly": [{"month": 1, "2024": 9.0, "2025": 11.62, "2026": 12.19}, {"month": 2, "2024": 7.93, "2025": 13.19, "2026": 10.46}, {"month": 3, "2024": 8.18, "2025": 10.49, "2026": 14.56}, {"month": 4, "2024": 9.31, "2025": 7.27, "2026": 8.97}, {"month": 5, "2024": 8.79, "2025": 7.6, "2026": 10.51}, {"month": 6, "2024": 10.61, "2025": 8.77, "2026": 9.32}, {"month": 7, "2024": 8.63, "2025": 8.08, "2026": null}, {"month": 8, "2024": 6.68, "2025": 4.23, "2026": null}, {"month": 9, "2024": 6.53, "2025": 10.76, "2026": null}, {"month": 10, "2024": 5.93, "2025": 5.67, "2026": null}, {"month": 11, "2024": 10.43, "2025": 9.07, "2026": null}, {"month": 12, "2024": 12.88, "2025": 16.6, "2026": null}], "categories": [{"name": "New Zealand", "color": "#4f6f9f"}, {"name": "France", "color": "#9ddbdd"}, {"name": "Netherlands", "color": "#77a9c8"}, {"name": "Belgium", "color": "#f5a91d"}, {"name": "Germany", "color": "#7fc39c"}, {"name": "Others", "color": "#d1d5da"}], "stacked": [{"month": "2025-07", "totalKmt": 8.1, "parts": [{"name": "New Zealand", "kmt": 5.768, "share": 0.7140390411021647}, {"name": "France", "kmt": 0.636, "share": 0.07878321312326096}, {"name": "Netherlands", "kmt": 0.558, "share": 0.0691105791548233}, {"name": "Belgium", "kmt": 0.569, "share": 0.07041034824156098}, {"name": "Germany", "kmt": 0.0, "share": 0.0}, {"name": "Others", "kmt": 0.547, "share": 0.06765681837819018}]}, {"month": "2025-08", "totalKmt": 4.2, "parts": [{"name": "New Zealand", "kmt": 2.844, "share": 0.6728101048770639}, {"name": "France", "kmt": 0.515, "share": 0.12188933436386389}, {"name": "Netherlands", "kmt": 0.173, "share": 0.040821405699477335}, {"name": "Belgium", "kmt": 0.262, "share": 0.06198324134026695}, {"name": "Germany", "kmt": 0.0, "share": 0.0}, {"name": "Others", "kmt": 0.433, "share": 0.10249591371932804}]}, {"month": "2025-09", "totalKmt": 10.8, "parts": [{"name": "New Zealand", "kmt": 9.106, "share": 0.8462910804841208}, {"name": "France", "kmt": 0.28, "share": 0.0260051442464205}, {"name": "Netherlands", "kmt": 0.586, "share": 0.054452583465755974}, {"name": "Belgium", "kmt": 0.358, "share": 0.03326186429817337}, {"name": "Germany", "kmt": 0.02, "share": 0.0018140638459398844}, {"name": "Others", "kmt": 0.411, "share": 0.0381752636595895}]}, {"month": "2025-10", "totalKmt": 5.7, "parts": [{"name": "New Zealand", "kmt": 4.449, "share": 0.7851288225668221}, {"name": "France", "kmt": 0.388, "share": 0.06848922925305782}, {"name": "Netherlands", "kmt": 0.513, "share": 0.09045394282616151}, {"name": "Belgium", "kmt": 0.196, "share": 0.0346637750772667}, {"name": "Germany", "kmt": 0.022, "share": 0.0038827494384132393}, {"name": "Others", "kmt": 0.098, "share": 0.017381480838278642}]}, {"month": "2025-11", "totalKmt": 9.1, "parts": [{"name": "New Zealand", "kmt": 7.508, "share": 0.82750938693758}, {"name": "France", "kmt": 0.393, "share": 0.04333697722643963}, {"name": "Netherlands", "kmt": 0.265, "share": 0.029186415443052654}, {"name": "Belgium", "kmt": 0.612, "share": 0.06750185225721873}, {"name": "Germany", "kmt": 0.0, "share": 0.0}, {"name": "Others", "kmt": 0.295, "share": 0.032465368135708994}]}, {"month": "2025-12", "totalKmt": 16.6, "parts": [{"name": "New Zealand", "kmt": 15.585, "share": 0.9386924635014746}, {"name": "France", "kmt": 0.581, "share": 0.034981991135515235}, {"name": "Netherlands", "kmt": 0.153, "share": 0.009223222523961074}, {"name": "Belgium", "kmt": 0.0, "share": 0.0}, {"name": "Germany", "kmt": 0.044, "share": 0.002650178221473828}, {"name": "Others", "kmt": 0.24, "share": 0.014452144617575121}]}, {"month": "2026-01", "totalKmt": 12.2, "parts": [{"name": "New Zealand", "kmt": 10.856, "share": 0.8905268787700188}, {"name": "France", "kmt": 0.563, "share": 0.046211904020710785}, {"name": "Netherlands", "kmt": 0.304, "share": 0.02492831658088445}, {"name": "Belgium", "kmt": 0.085, "share": 0.006975777956328382}, {"name": "Germany", "kmt": 0.047, "share": 0.003834873229754843}, {"name": "Others", "kmt": 0.336, "share": 0.027522249442302926}]}, {"month": "2026-02", "totalKmt": 10.5, "parts": [{"name": "New Zealand", "kmt": 9.516, "share": 0.9094059625936628}, {"name": "France", "kmt": 0.357, "share": 0.034136472301716354}, {"name": "Netherlands", "kmt": 0.351, "share": 0.03354442749171304}, {"name": "Belgium", "kmt": 0.05, "share": 0.004776019270365696}, {"name": "Germany", "kmt": 0.0, "share": 0.0}, {"name": "Others", "kmt": 0.19, "share": 0.018137118342542044}]}, {"month": "2026-03", "totalKmt": 14.6, "parts": [{"name": "New Zealand", "kmt": 12.964, "share": 0.8901771710948739}, {"name": "France", "kmt": 0.675, "share": 0.04631485042770988}, {"name": "Netherlands", "kmt": 0.322, "share": 0.02209222746218919}, {"name": "Belgium", "kmt": 0.148, "share": 0.010148664197524592}, {"name": "Germany", "kmt": 0.093, "share": 0.0064201630748886955}, {"name": "Others", "kmt": 0.362, "share": 0.024846923742813512}]}, {"month": "2026-04", "totalKmt": 9.0, "parts": [{"name": "New Zealand", "kmt": 7.812, "share": 0.870653295500673}, {"name": "France", "kmt": 0.512, "share": 0.05706073310030091}, {"name": "Netherlands", "kmt": 0.0, "share": 0.0}, {"name": "Belgium", "kmt": 0.175, "share": 0.01950481835887127}, {"name": "Germany", "kmt": 0.066, "share": 0.0073936636312711065}, {"name": "Others", "kmt": 0.407, "share": 0.04538748940888363}]}, {"month": "2026-05", "totalKmt": 10.5, "parts": [{"name": "New Zealand", "kmt": 8.489, "share": 0.8073715994384308}, {"name": "France", "kmt": 0.778, "share": 0.07400979008302082}, {"name": "Netherlands", "kmt": 0.25, "share": 0.02377281802956389}, {"name": "Belgium", "kmt": 0.326, "share": 0.030998347078197496}, {"name": "Germany", "kmt": 0.142, "share": 0.013503284015792493}, {"name": "Others", "kmt": 0.529, "share": 0.05034416135499456}]}, {"month": "2026-06", "totalKmt": 9.3, "parts": [{"name": "New Zealand", "kmt": 6.406, "share": 0.6869941591186781}, {"name": "France", "kmt": 0.818, "share": 0.08769965925064312}, {"name": "Netherlands", "kmt": 0.754, "share": 0.0808197889226484}, {"name": "Belgium", "kmt": 0.402, "share": 0.043069569043704355}, {"name": "Germany", "kmt": 0.142, "share": 0.015236825253695954}, {"name": "Others", "kmt": 0.804, "share": 0.08617999841062995}]}], "latestMonth": "2026-06", "latestMonthShort": "Jun"}, {"key": "cheese", "product": "Cheese", "zh": "&#24178;&#37226;", "years": [2024, 2025, 2026], "annual": [{"label": "2024", "kmt": 172.6}, {"label": "2025", "kmt": 196.6}, {"label": "2026YTD", "kmt": 121.6}], "monthly": [{"month": 1, "2024": 15.44, "2025": 14.53, "2026": 20.23}, {"month": 2, "2024": 10.36, "2025": 15.02, "2026": 18.42}, {"month": 3, "2024": 15.4, "2025": 16.73, "2026": 23.51}, {"month": 4, "2024": 16.07, "2025": 17.06, "2026": 19.93}, {"month": 5, "2024": 14.94, "2025": 18.34, "2026": 16.91}, {"month": 6, "2024": 16.2, "2025": 15.75, "2026": 22.58}, {"month": 7, "2024": 15.81, "2025": 19.09, "2026": null}, {"month": 8, "2024": 14.06, "2025": 12.34, "2026": null}, {"month": 9, "2024": 12.57, "2025": 14.27, "2026": null}, {"month": 10, "2024": 9.86, "2025": 12.89, "2026": null}, {"month": 11, "2024": 13.99, "2025": 18.39, "2026": null}, {"month": 12, "2024": 17.87, "2025": 22.22, "2026": null}], "categories": [{"name": "New Zealand", "color": "#4f6f9f"}, {"name": "Australia", "color": "#5d88b3"}, {"name": "United States", "color": "#95a5bd"}, {"name": "Italy", "color": "#b987c9"}, {"name": "Denmark", "color": "#d7a44a"}, {"name": "Others", "color": "#d1d5da"}], "stacked": [{"month": "2025-07", "totalKmt": 19.1, "parts": [{"name": "New Zealand", "kmt": 12.327, "share": 0.645759627116941}, {"name": "Australia", "kmt": 2.96, "share": 0.15507664817852426}, {"name": "United States", "kmt": 0.33, "share": 0.017263422788994245}, {"name": "Italy", "kmt": 1.089, "share": 0.057041454018453355}, {"name": "Denmark", "kmt": 0.697, "share": 0.03653125127858725}, {"name": "Others", "kmt": 1.686, "share": 0.08832759661849984}]}, {"month": "2025-08", "totalKmt": 12.3, "parts": [{"name": "New Zealand", "kmt": 6.545, "share": 0.5303405463634311}, {"name": "Australia", "kmt": 2.236, "share": 0.1811934821421699}, {"name": "United States", "kmt": 0.266, "share": 0.021524844258751872}, {"name": "Italy", "kmt": 0.856, "share": 0.06938858520060105}, {"name": "Denmark", "kmt": 0.604, "share": 0.04894267725454625}, {"name": "Others", "kmt": 1.834, "share": 0.1486098647804995}]}, {"month": "2025-09", "totalKmt": 14.3, "parts": [{"name": "New Zealand", "kmt": 7.98, "share": 0.5593100314910472}, {"name": "Australia", "kmt": 2.732, "share": 0.19151740755112256}, {"name": "United States", "kmt": 0.347, "share": 0.024294675680343443}, {"name": "Italy", "kmt": 0.562, "share": 0.039407756913339066}, {"name": "Denmark", "kmt": 0.8, "share": 0.05607569458618657}, {"name": "Others", "kmt": 1.846, "share": 0.12939443377796114}]}, {"month": "2025-10", "totalKmt": 12.9, "parts": [{"name": "New Zealand", "kmt": 6.163, "share": 0.47797491848608786}, {"name": "Australia", "kmt": 3.057, "share": 0.23707872070039995}, {"name": "United States", "kmt": 0.326, "share": 0.0252896708406112}, {"name": "Italy", "kmt": 0.638, "share": 0.049506914703277886}, {"name": "Denmark", "kmt": 0.853, "share": 0.06613721078091576}, {"name": "Others", "kmt": 1.857, "share": 0.1440125644887071}]}, {"month": "2025-11", "totalKmt": 18.4, "parts": [{"name": "New Zealand", "kmt": 11.366, "share": 0.6180083974024461}, {"name": "Australia", "kmt": 3.383, "share": 0.18395180125679914}, {"name": "United States", "kmt": 0.398, "share": 0.021624858277453148}, {"name": "Italy", "kmt": 0.784, "share": 0.042619016896976177}, {"name": "Denmark", "kmt": 1.202, "share": 0.06533736341660319}, {"name": "Others", "kmt": 1.259, "share": 0.06845856274972217}]}, {"month": "2025-12", "totalKmt": 22.2, "parts": [{"name": "New Zealand", "kmt": 13.293, "share": 0.5982140562921112}, {"name": "Australia", "kmt": 4.728, "share": 0.21277733299786963}, {"name": "United States", "kmt": 0.137, "share": 0.006145582816506381}, {"name": "Italy", "kmt": 0.982, "share": 0.044210062858043644}, {"name": "Denmark", "kmt": 0.736, "share": 0.03311402041321526}, {"name": "Others", "kmt": 2.345, "share": 0.10553894462225391}]}, {"month": "2026-01", "totalKmt": 20.2, "parts": [{"name": "New Zealand", "kmt": 11.864, "share": 0.5864522698649857}, {"name": "Australia", "kmt": 4.071, "share": 0.2012297389135395}, {"name": "United States", "kmt": 0.223, "share": 0.01104495233815141}, {"name": "Italy", "kmt": 0.858, "share": 0.04240717976768381}, {"name": "Denmark", "kmt": 0.844, "share": 0.041712749087895525}, {"name": "Others", "kmt": 2.37, "share": 0.1171531100277444}]}, {"month": "2026-02", "totalKmt": 18.4, "parts": [{"name": "New Zealand", "kmt": 12.783, "share": 0.694004859253687}, {"name": "Australia", "kmt": 2.262, "share": 0.12282403498297828}, {"name": "United States", "kmt": 0.28, "share": 0.015191180356293514}, {"name": "Italy", "kmt": 0.477, "share": 0.02589108259683477}, {"name": "Denmark", "kmt": 0.62, "share": 0.03364272851117398}, {"name": "Others", "kmt": 1.998, "share": 0.10844611429903264}]}, {"month": "2026-03", "totalKmt": 23.5, "parts": [{"name": "New Zealand", "kmt": 15.201, "share": 0.6466284926935213}, {"name": "Australia", "kmt": 4.291, "share": 0.18252457307376255}, {"name": "United States", "kmt": 0.668, "share": 0.02843544702419028}, {"name": "Italy", "kmt": 0.885, "share": 0.037651801265412156}, {"name": "Denmark", "kmt": 0.435, "share": 0.018495748539423134}, {"name": "Others", "kmt": 2.028, "share": 0.08626393740369061}]}, {"month": "2026-04", "totalKmt": 19.9, "parts": [{"name": "New Zealand", "kmt": 12.075, "share": 0.6057370126273814}, {"name": "Australia", "kmt": 3.704, "share": 0.1858262619354922}, {"name": "United States", "kmt": 0.507, "share": 0.025421263877919265}, {"name": "Italy", "kmt": 0.865, "share": 0.043386908603186225}, {"name": "Denmark", "kmt": 0.9, "share": 0.04515631320914642}, {"name": "Others", "kmt": 1.883, "share": 0.0944722397468746}]}, {"month": "2026-05", "totalKmt": 16.9, "parts": [{"name": "New Zealand", "kmt": 11.218, "share": 0.6634350173961538}, {"name": "Australia", "kmt": 2.227, "share": 0.13173125884518871}, {"name": "United States", "kmt": 0.383, "share": 0.022646226161236887}, {"name": "Italy", "kmt": 0.796, "share": 0.04707204663103654}, {"name": "Denmark", "kmt": 0.43, "share": 0.025445992674867874}, {"name": "Others", "kmt": 1.854, "share": 0.10966945829151614}]}, {"month": "2026-06", "totalKmt": 22.6, "parts": [{"name": "New Zealand", "kmt": 15.874, "share": 0.7031371446145401}, {"name": "Australia", "kmt": 2.982, "share": 0.13210824628172557}, {"name": "United States", "kmt": 0.376, "share": 0.01663584207954139}, {"name": "Italy", "kmt": 0.619, "share": 0.027426965041405554}, {"name": "Denmark", "kmt": 0.625, "share": 0.02769814285719981}, {"name": "Others", "kmt": 2.099, "share": 0.09299365912558762}]}], "latestMonth": "2026-06", "latestMonthShort": "Jun"}];
+const root = document.getElementById('root');
+const fmt = v => Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 });
+const fmt2 = v => Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
+const pct = v => `${Math.round(v * 100)}%`;
+
+function makeSection(p) {
+  const section = document.createElement('section');
+  section.className = 'product';
+  section.id = p.key;
+  section.innerHTML = `<h2>${p.zh}&#36827;&#21475;&#20998;&#26512;</h2><div class="grid">
+    <div class="panel"><div class="title">&#24180;&#24230;&#36827;&#21475;&#37327;&#65292;&#21315;&#21544;</div><div id="${p.key}-annual" class="chart"></div></div>
+    <div class="panel"><div class="title">&#26376;&#24230;${p.zh}&#36827;&#21475;&#24635;&#37327;&#21464;&#21270;&#65292;&#21315;&#21544;</div><div id="${p.key}-monthly" class="chart"></div></div>
+    <div class="panel"><div class="title">&#36817;12&#20010;&#26376;${p.zh}&#36827;&#21475;&#26469;&#28304;&#21344;&#27604;&#65292;%</div><div id="${p.key}-stacked" class="chart"></div></div>
+  </div>`;
+  root.appendChild(section);
+}
+
+function drawAnnual(p) {
+  const chart = echarts.init(document.getElementById(`${p.key}-annual`));
+  chart.setOption({
+    animation: false,
+    grid: { left: 70, right: 40, top: 70, bottom: 75 },
+    tooltip: { trigger: 'item', formatter: d => `<b>${p.zh} ${d.name}</b><br/>&#24180;&#24230;&#36827;&#21475;&#37327;&#65306;${fmt(d.value)} &#21315;&#21544;` },
+    xAxis: { type: 'value', show: false, max: value => value.max * 1.32 },
+    yAxis: { type: 'category', inverse: true, axisLine: { show: true, lineStyle: { color: '#222' } }, axisTick: { show: false }, axisLabel: { color: '#003b68', fontSize: 14, formatter: v => v.replace('YTD', `YTD
+(${p.latestMonthShort})`) }, data: p.annual.map(d => d.label) },
+    series: [{ type: 'bar', data: p.annual.map(d => d.kmt), barWidth: 44, itemStyle: { color: '#003b68' }, label: { show: true, position: 'right', color: '#003b68', fontSize: 20, formatter: d => fmt(d.value) } }]
+  });
+  return chart;
+}
+
+function drawMonthly(p) {
+  const chart = echarts.init(document.getElementById(`${p.key}-monthly`));
+  const colors = ['#003b68', '#9ddbdd', '#f4a36b'];
+  chart.setOption({
+    animation: false,
+    color: colors,
+    grid: { left: 48, right: 8, top: 55, bottom: 55 },
+    tooltip: { trigger: 'axis', valueFormatter: v => v == null ? '' : `${fmt2(v)} &#21315;&#21544;` },
+    legend: { top: 2, itemWidth: 30, itemHeight: 4, textStyle: { color: '#003b68', fontSize: 20 }, data: p.years.map(String) },
+    xAxis: { type: 'category', boundaryGap: false, axisLine: { lineStyle: { color: '#222' } }, axisTick: { show: false }, axisLabel: { color: '#565656', fontSize: 18 }, data: Array.from({length: 12}, (_, i) => String(i + 1)) },
+    yAxis: { type: 'value', min: 0, max: value => Math.max(40, Math.ceil(value.max / 10) * 10), interval: 10, axisLine: { show: true, lineStyle: { color: '#222' } }, axisLabel: { color: '#565656', fontSize: 18 }, splitLine: { show: false } },
+    series: p.years.map((year, i) => ({ name: String(year), type: 'line', symbolSize: 8, showSymbol: false, connectNulls: false, lineStyle: { width: 4, color: colors[i] }, itemStyle: { color: colors[i] }, data: p.monthly.map(d => d[String(year)]) }))
+  });
+  return chart;
+}
+
+function drawStacked(p) {
+  const chart = echarts.init(document.getElementById(`${p.key}-stacked`));
+  const months = p.stacked.map(d => d.month.replace('-', ''));
+  const series = p.categories.map(cat => ({
+    name: cat.name,
+    type: 'bar',
+    stack: 'total',
+    barWidth: 34,
+    itemStyle: { color: cat.color },
+    label: { show: true, color: cat.name === 'New Zealand' ? '#fff' : '#003b68', fontSize: 16, formatter: d => d.data.share > 0.05 ? pct(d.data.share) : '' },
+    emphasis: { focus: 'series' },
+    data: p.stacked.map(m => {
+      const part = m.parts.find(x => x.name === cat.name) || { kmt: 0, share: 0 };
+      return { value: part.kmt, share: part.share, month: m.month, totalKmt: m.totalKmt };
+    })
+  }));
+  series.push({ name: 'Total', type: 'bar', barGap: '-100%', barWidth: 34, silent: true, itemStyle: { color: 'transparent' }, label: { show: true, position: 'top', color: '#003b68', fontSize: 20, formatter: d => fmt(d.value) }, data: p.stacked.map(d => d.totalKmt) });
+  chart.setOption({
+    animation: false,
+    grid: { left: 12, right: 10, top: 62, bottom: 55 },
+    legend: { top: 2, left: 0, itemWidth: 23, itemHeight: 17, textStyle: { color: '#003b68', fontSize: 15 }, data: p.categories.map(c => c.name) },
+    tooltip: { trigger: 'item', formatter: d => d.seriesName === 'Total' ? '' : `<b>${d.data.month} ${d.seriesName}</b><br/>&#36827;&#21475;&#37327;&#65306;${fmt2(d.value)} &#21315;&#21544;<br/>&#21344;&#27604;&#65306;${pct(d.data.share)}<br/>&#24635;&#37327;&#65306;${fmt(d.data.totalKmt)} &#21315;&#21544;` },
+    xAxis: { type: 'category', axisLine: { lineStyle: { color: '#222' } }, axisTick: { show: false }, axisLabel: { color: '#003b68', fontSize: 20, interval: 2 }, data: months },
+    yAxis: { type: 'value', show: false },
+    series
+  });
+  return chart;
+}
+
+const charts = [];
+products.forEach(p => { makeSection(p); charts.push(drawAnnual(p), drawMonthly(p), drawStacked(p)); });
+window.addEventListener('resize', () => charts.forEach(c => c.resize()));
+</script>
 </body>
 </html>
