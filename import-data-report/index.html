@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>&#36827;&#21475;&#22270;&#34920;&#27719;&#24635;</title>
+<style>
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: #fff; color: #003b68; font-family: Arial, "Microsoft YaHei", sans-serif; }
+.summary-page { padding: 18px 22px 30px; max-width: 1480px; margin: 0 auto; }
+.summary-top { position: sticky; top: 0; z-index: 5; background: rgba(255,255,255,.96); display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 6px 0 14px; border-bottom: 1px solid #d8e0e8; }
+h1 { font-size: 24px; font-weight: 500; margin: 0; color: #003b68; }
+.summary-top nav { display: flex; flex-wrap: wrap; gap: 10px; }
+.summary-top a, .summary-heading a { color: #003b68; text-decoration: none; border: 1px solid #d8e0e8; padding: 7px 12px; font-size: 14px; background: #fff; }
+.summary-section { padding-top: 20px; scroll-margin-top: 74px; }
+.summary-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.summary-heading h2 { margin: 0; font-size: 22px; font-weight: 500; color: #222; }
+iframe { width: 100%; height: 650px; border: 1px solid #d8e0e8; display: block; }
+@media (max-width: 1050px) {
+  .summary-top { position: static; align-items: flex-start; flex-direction: column; }
+  .summary-section { scroll-margin-top: 0; }
+  iframe { height: 1740px; }
+}
+</style>
+</head>
+<body>
+<main class="summary-page">
+  <div class="summary-top"><h1>&#36827;&#21475;&#22270;&#34920;&#27719;&#24635;</h1><nav><a href="#cream">&#28129;&#22902;&#27833;</a><a href="#butter">&#40644;&#27833;</a><a href="#cheese">&#24178;&#37226;</a></nav></div>
+  <section id="cream" class="summary-section">
+  <div class="summary-heading">
+    <h2>&#28129;&#22902;&#27833;&#36827;&#21475;&#20998;&#26512;</h2>
+    <a href="cream.html">&#25171;&#24320;&#21333;&#39029;</a>
+  </div>
+  <iframe src="cream.html" title="&#28129;&#22902;&#27833;&#36827;&#21475;&#20998;&#26512;"></iframe>
+</section><section id="butter" class="summary-section">
+  <div class="summary-heading">
+    <h2>&#40644;&#27833;&#36827;&#21475;&#20998;&#26512;</h2>
+    <a href="butter.html">&#25171;&#24320;&#21333;&#39029;</a>
+  </div>
+  <iframe src="butter.html" title="&#40644;&#27833;&#36827;&#21475;&#20998;&#26512;"></iframe>
+</section><section id="cheese" class="summary-section">
+  <div class="summary-heading">
+    <h2>&#24178;&#37226;&#36827;&#21475;&#20998;&#26512;</h2>
+    <a href="cheese.html">&#25171;&#24320;&#21333;&#39029;</a>
+  </div>
+  <iframe src="cheese.html" title="&#24178;&#37226;&#36827;&#21475;&#20998;&#26512;"></iframe>
+</section>
+</main>
+</body>
+</html>
