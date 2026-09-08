@@ -8,6 +8,7 @@ on:
       - "sgx-*-dashboard/config.example.json"
       - "sgx-*-dashboard/tests/**"
       - "site-index.html"
+      - "access-gate.js"
       - ".github/workflows/sgx-butter-pages.yml"
   workflow_dispatch:
   schedule:
@@ -89,6 +90,7 @@ jobs:
         run: |
           mkdir -p _site/btr _site/wmp _site/smp _site/amf _site/milkprice
           cp site-index.html _site/index.html
+          cp access-gate.js _site/access-gate.js
           cp sgx-butter-dashboard/dashboard.html _site/btr/index.html
           cp sgx-wmp-dashboard/dashboard.html _site/wmp/index.html
           cp sgx-smp-dashboard/dashboard.html _site/smp/index.html
